@@ -9,9 +9,10 @@ Ziglang-Set: a generic and general-purpose Set implementation for Zig.
 <p align="center">
   <img src="assets/ZigSetGraphic.png" width="512"/>
 </p>
-<p align="center">
-Zig currently doesn't have a built-in, general purpose Set data structure at this point in time. Until it does, use this!
-</p>
+
+#
+
+[Zig currently doesn't have a built-in, general purpose Set data structure](https://github.com/ziglang/zig/issues/6919) at this point in time. Until it does, use this!
 
 #
 
