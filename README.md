@@ -101,7 +101,7 @@ Output of `A | B` - the union of A and B (order is not guaranteed)
 
 #### Installation of Module
 
-To add this module, update your applications build.zig.zon file:
+To add this module, update your applications build.zig.zon file by adding the `.ziglang-set` dependency definition. 
 
 ```zig
 .{
@@ -115,8 +115,8 @@ To add this module, update your applications build.zig.zon file:
 }
 ```
 
-When running zig build now, zig will tell you you need a hash for the dependency and provide one.
-Put it in you dependency so it looks like:
+When running zig build now, Zig will tell you you need a hash for the dependency and provide one.
+Put it in your dependency so it looks like:
 
 ```zig
 .{
@@ -133,7 +133,7 @@ With the dependency in place, you can now put the following in your build.zig fi
     // This will create a `std.build.Dependency` which you can use to fetch
     // the `ziglang-set` module. The first argument is the dependency name. It
     // should be the same as the one you used in build.zig.zon.
-    const ziglang-set = b.dependency("ziglang-set", .{});
+    const ziglangSet = b.dependency("ziglang-set", .{});
     // This will create a module which you can use in your zig code. The first
     // argument is the name you want your module to have in your zig code. It
     // can be anything you want. In your zig code you can use `@import` with
@@ -145,7 +145,7 @@ With the dependency in place, you can now put the following in your build.zig fi
     // that some packages can expose multiple modules. Therefor, you need to
     // specify which one you want. This package only exposes one module though,
     // so it will always be the same.
-    exe.addModule("ziglang-set", ziglang-set.module("ziglang-set"));
+    exe.addModule("ziglang-set", ziglangSet.module("ziglang-set"));
 ```
 
 In the above change `exe` to whatever CompileStep you are using. For an executable it will
@@ -155,10 +155,11 @@ With the build file in order, you can now use the module in your zig source. For
 
 ```zig
 const std = @import("std");
-const set = @import("ziglangset");
+const set = @import("ziglang-set");
 
 pub fn main() void {
-    // 1. Setup and choose your respective allocator.
+    // 1. This datastructure requires an allocator.
+    //    Setup and choose your respective allocator.
     // See: https://zig.guide/standard-library/allocators
 
     // 2. Go to town!
@@ -170,4 +171,4 @@ pub fn main() void {
 }
 ```
 
-Check the tests for more examples on how to use this package.
+Check the tests for more comprehensive examples on how to use this package.
