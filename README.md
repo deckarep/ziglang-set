@@ -48,7 +48,7 @@ Furthermore, my intention is to build a general-purpose and performant Zig modul
 #### Why use a set?
   * A set offers a fast way to manipulate data and avoid excessive looping. Look into it as there is already tons of literature on the advantages of having a set in your arsenal of tools.
 #
-#### Usage
+#### Example
 ```zig
     // import the namespace.
     const set = @import("set.zig");
@@ -96,3 +96,78 @@ Output of `A | B` - the union of A and B (order is not guaranteed)
 > element: 30
 > element: 20
 ```
+
+#
+
+#### Installation of Module
+
+To add this module, update your applications build.zig.zon file:
+
+```zig
+.{
+    .name = "your-app",
+    .version = "0.1.0",
+    .dependencies = .{
+        .ziglang-set = .{
+            .url = "https://github.com/deckarep/ziglang-set/archive/$COMMIT_YOU_WANT_TO_USE.tar.gz",
+        },
+    },
+}
+```
+
+When running zig build now, zig will tell you you need a hash for the dependency and provide one.
+Put it in you dependency so it looks like:
+
+```zig
+.{
+  .ziglang-set = .{
+      .url = "https://github.com/deckarep/ziglang-set/archive/$COMMIT_YOU_WANT_TO_USE.tar.gz",
+      .hash = "$HASH_ZIG_GAVE_YOU",
+  },
+}
+```
+
+With the dependency in place, you can now put the following in your build.zig file:
+
+```zig
+    // This will create a `std.build.Dependency` which you can use to fetch
+    // the `ziglang-set` module. The first argument is the dependency name. It
+    // should be the same as the one you used in build.zig.zon.
+    const ziglang-set = b.dependency("ziglang-set", .{});
+    // This will create a module which you can use in your zig code. The first
+    // argument is the name you want your module to have in your zig code. It
+    // can be anything you want. In your zig code you can use `@import` with
+    // the same name to use it. The second argument is a module. You can
+    // fetch it from the dependency with its `module` method. This method
+    // takes one argument which is the name of the module. This time, the
+    // name is the one the `ziglang-set` package uses. It must be exactly the
+    // same string as below: "ziglang-set". The reason for needing this name is
+    // that some packages can expose multiple modules. Therefor, you need to
+    // specify which one you want. This package only exposes one module though,
+    // so it will always be the same.
+    exe.addModule("ziglang-set", ziglang-set.module("ziglang-set"));
+```
+
+In the above change `exe` to whatever CompileStep you are using. For an executable it will
+probably be exe, but `main_tests` or lib are also common.
+
+With the build file in order, you can now use the module in your zig source. For example:
+
+```zig
+const std = @import("std");
+const set = @import("ziglangset");
+
+pub fn main() void {
+    // 1. Setup and choose your respective allocator.
+    // See: https://zig.guide/standard-library/allocators
+
+    // 2. Go to town!
+    var A = Set(u32).init(allocator);
+    defer A.deinit();
+
+    // Now do something cool with your set!
+    // ...
+}
+```
+
+Check the tests for more examples on how to use this package.
