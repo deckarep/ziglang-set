@@ -1,0 +1,14 @@
+.{
+    .name = "ziglangset",
+    .version = "0.0.1",
+    .minimum_zig_version = "0.12.0",
+
+    .dependencies = .{},
+
+    .paths = .{
+        "LICENSE",
+        "build.zig",
+        "build.zig.zon",
+        "set.zig",
+    },
+}
