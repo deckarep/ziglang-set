@@ -1,7 +1,7 @@
 ### Ziglang Set
 
 <p align="center">
-Ziglang-Set: a generic and general-purpose Set implementation for Zig.
+Ziglang-Set: a generic and general-purpose Set implementation for Zig. <br/> 🚧 PRE-ALPHA 🚧
 </p>
 
 #
