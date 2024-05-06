@@ -12,7 +12,7 @@ Ziglang-Set: a generic and general-purpose Set implementation for Zig.
 
 #
 
-[Zig currently doesn't have a built-in, general purpose Set data structure](https://github.com/ziglang/zig/issues/6919) at this point in time. Until it does, use this!
+Zig currently [does not have](https://github.com/ziglang/zig/issues/6919) a built-in, general purpose Set data structure at this point in time. Until it does, use this!
 
 #
 
