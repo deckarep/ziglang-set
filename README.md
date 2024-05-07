@@ -12,17 +12,18 @@ Ziglang-Set: a generic and general-purpose Set implementation for Zig. <br/> ðŸš
 
 #
 
-Zig currently [does not have](https://github.com/ziglang/zig/issues/6919) a built-in, general purpose Set data structure at this point in time. Until it does, use this!
+Zig currently [does not have](https://github.com/ziglang/zig/issues/6919) a built-in, general purpose Set data structure at this point in time. Until it does, try this!
 
 #
 
-This module offers a fast Set implementation built in the same vein and spirit of the other data structures within the Zig standard library. This is my attempt to model one that can get better over time and grow with community interest and support. See a problem, file a bug! Or better yet contribute and let's build the best implementation together.
+This module offers a Set implementation built in the same vein and spirit of the other data structures within the Zig standard library. This is my attempt to model one that can get better over time and grow with community interest and support. See a problem, file a bug! Or better yet contribute and let's build the best implementation together.
 
 I am the original author of the popular Go based set package: [golang-set](https://github.com/deckarep/golang-set) that is used by software components built by Docker, 1Password, Ethereum, SendGrid, CrowdStrike and HashiCorp. At just shy of `4k stars`, I figured I'd take a crack at building a comprehensive and generic Zig-based set that goes above and beyond the original Go implementation. After using Zig for over 2.5 years on personal projects, I thought it was time that Zig had a robust Set implementation for itself.
 
-This implementation gives credit and acknowledgement to the [Zig language](https://ziglang.org) and powerful [Std Library](https://ziglang.org/documentation/master/std/#std) [HashMap](https://ziglang.org/documentation/master/std/#std.hash_map.HashMap) data structure of which this set implementation is built on top of. Without that, this probably wouldn't exist.
-Furthermore, my intention is to build a general-purpose and performant Zig module that can grow with the community and offers idiomatic Zig code even while this implementation is inspired by the Go implementation (which was inspired by the Python implementation prior).
+This implementation gives credit and acknowledgement to the [Zig language](https://ziglang.org) and powerful [Std Library](https://ziglang.org/documentation/master/std/#std) [HashMap](https://ziglang.org/documentation/master/std/#std.hash_map.HashMap) data structure of which this set implementation is built on top of. Without that, this probably wouldn't exist. Efforts will be made to keep the Ziglang Set code fast and straightforward but this Set's raw speed will largely be bounded by the performance of the Zig HashMap of which it is built on top of.
+
 #
+
 #### Features
   * Offers idiomatic, generic-based Zig API - allocators, iterators, capacity hints, clearing, resizing, etc.
   * Common set operations
