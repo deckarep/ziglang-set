@@ -22,6 +22,17 @@ const std = @import("std");
 const mem = std.mem;
 const Allocator = mem.Allocator;
 
+// comptime selection of the map type for string vs everything else.
+fn selectMap(comptime E: type) type {
+    comptime {
+        if (E == []const u8) {
+            return std.StringHashMap(void);
+        } else {
+            return std.AutoHashMap(E, void);
+        }
+    }
+}
+
 /// TODO: support Zig "strings" eventually, doesn't work currently.
 /// fn Set(E) creates a set based on element type E.
 /// This implementation is backed by the std.AutoHashMap implementation
@@ -41,7 +52,8 @@ pub fn Set(comptime E: type) type {
         map: Map,
 
         /// The type of the internal hash map
-        pub const Map = std.AutoHashMap(E, void);
+        pub const Map = selectMap(E);
+        //pub const Map = std.AutoHashMap(E, void);
         /// The integer type used to store the size of the map, borrowed from map
         pub const Size = Map.Size;
         /// The iterator type returned by iterator(), key-only for sets
@@ -52,7 +64,9 @@ pub fn Set(comptime E: type) type {
         /// Initialzies a Set with the given Allocator
         pub fn init(allocator: std.mem.Allocator) Self {
             return .{
-                .map = std.AutoHashMap(E, void).init(allocator),
+                .map = Map.init(allocator),
+                //.map = selectMap(E).init(allocator),
+                //.map = Map.init(allocator),//std.AutoHashMap(E, void).init(allocator),
             };
         }
 
@@ -525,6 +539,22 @@ test "example usage" {
     while (iter.next()) |el| {
         std.log.debug("element: {d}", .{el.*});
     }
+}
+
+test "string usage" {
+    var A = Set([]const u8).init(std.testing.allocator);
+    defer A.deinit();
+
+    var B = Set([]const u8).init(std.testing.allocator);
+    defer B.deinit();
+
+    _ = try A.add("Hello");
+    _ = try B.add("World");
+
+    var C = try A.unionOf(B);
+    defer C.deinit();
+    try expectEqual(2, C.cardinality());
+    try expect(C.containsAllSlice(&.{ "Hello", "World" }));
 }
 
 test "comprehensive usage" {
