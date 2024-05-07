@@ -1,5 +1,7 @@
 ### Ziglang Set
 
+![License](https://img.shields.io/github/license/deckarep/ziglang-set) ![Issue](https://img.shields.io/github/issues-raw/deckarep/ziglang-set?style=flat) ![Commit](https://img.shields.io/github/last-commit/deckarep/ziglang-set) ![CI](https://github.com/deckarep/ziglang-set/workflows/CI/badge.svg)
+
 <p align="center">
 Ziglang-Set: a generic and general-purpose Set implementation for Zig. <br/> 🚧 PRE-ALPHA 🚧
 </p>
