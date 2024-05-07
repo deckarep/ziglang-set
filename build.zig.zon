@@ -1,5 +1,5 @@
 .{
-    .name = "ziglang-set",
+    .name = "ziglangSet",
     .version = "0.0.1",
     .minimum_zig_version = "0.12.0",
 
@@ -9,6 +9,6 @@
         "LICENSE",
         "build.zig",
         "build.zig.zon",
-        "set.zig",
+        "src/set.zig",
     },
 }

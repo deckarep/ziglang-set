@@ -16,6 +16,8 @@ Ziglang-Set: a generic and general-purpose Set implementation for Zig. <br/> ðŸš
 
 Zig currently [does not have](https://github.com/ziglang/zig/issues/6919) a built-in, general purpose Set data structure at this point in time. Until it does, try this!
 
+Rationale: It may be common knowledge that a dictionary or map or hashset can be used as a set where the value is basically void. While this is true, there's a lot to think about in terms of supporting all the common set operations in a performant and correct way and there's no good reason why a common module for this can't exist. After studying the Zig stdlib, I'm hoping this implementation can fill that gap and provide some value.
+
 #
 
 This module offers a Set implementation built in the same vein and spirit of the other data structures within the Zig standard library. This is my attempt to model one that can get better over time and grow with community interest and support. See a problem, file a bug! Or better yet contribute and let's build the best implementation together.
@@ -54,10 +56,10 @@ This implementation gives credit and acknowledgement to the [Zig language](https
 #### Example
 ```zig
     // import the namespace.
-    const set = @import("set.zig");
+    const set = @import("ziglangSet");
 
     // Create a set of u32s called A
-    var A = Set(u32).init(std.testing.allocator);
+    var A = set.Set(u32).init(std.testing.allocator);
     defer A.deinit();
 
     // Add some data
@@ -69,7 +71,7 @@ This implementation gives credit and acknowledgement to the [Zig language](https
     _ = try A.appendSlice(&.{ 5, 3, 0, 9 });
 
     // Create another set called B
-    var B = Set(u32).init(std.testing.allocator);
+    var B = set.Set(u32).init(std.testing.allocator);
     defer B.deinit();
 
     // Add data to B
@@ -111,7 +113,7 @@ To add this module, update your applications build.zig.zon file by adding the `.
     .name = "your-app",
     .version = "0.1.0",
     .dependencies = .{
-        .ziglang-set = .{
+        .ziglangSet = .{
             .url = "https://github.com/deckarep/ziglang-set/archive/$COMMIT_YOU_WANT_TO_USE.tar.gz",
         },
     },
@@ -123,7 +125,7 @@ Put it in your dependency so it looks like:
 
 ```zig
 .{
-  .ziglang-set = .{
+  .ziglangSet = .{
       .url = "https://github.com/deckarep/ziglang-set/archive/$COMMIT_YOU_WANT_TO_USE.tar.gz",
       .hash = "$HASH_ZIG_GAVE_YOU",
   },
@@ -133,22 +135,8 @@ Put it in your dependency so it looks like:
 With the dependency in place, you can now put the following in your build.zig file:
 
 ```zig
-    // This will create a `std.build.Dependency` which you can use to fetch
-    // the `ziglang-set` module. The first argument is the dependency name. It
-    // should be the same as the one you used in build.zig.zon.
-    const ziglangSet = b.dependency("ziglang-set", .{});
-    // This will create a module which you can use in your zig code. The first
-    // argument is the name you want your module to have in your zig code. It
-    // can be anything you want. In your zig code you can use `@import` with
-    // the same name to use it. The second argument is a module. You can
-    // fetch it from the dependency with its `module` method. This method
-    // takes one argument which is the name of the module. This time, the
-    // name is the one the `ziglang-set` package uses. It must be exactly the
-    // same string as below: "ziglang-set". The reason for needing this name is
-    // that some packages can expose multiple modules. Therefor, you need to
-    // specify which one you want. This package only exposes one module though,
-    // so it will always be the same.
-    exe.addModule("ziglang-set", ziglangSet.module("ziglang-set"));
+    const ziglangSet = b.dependency("ziglangSet", .{});
+    exe.root_module.addImport("ziglangSet", ziglangSet.module("ziglangSet"));
 ```
 
 In the above change `exe` to whatever CompileStep you are using. For an executable it will
@@ -158,7 +146,7 @@ With the build file in order, you can now use the module in your zig source. For
 
 ```zig
 const std = @import("std");
-const set = @import("ziglang-set");
+const set = @import("ziglangSet");
 
 pub fn main() void {
     // 1. This datastructure requires an allocator.
@@ -166,7 +154,7 @@ pub fn main() void {
     // See: https://zig.guide/standard-library/allocators
 
     // 2. Go to town!
-    var A = Set(u32).init(allocator);
+    var A = set.Set(u32).init(allocator);
     defer A.deinit();
 
     // Now do something cool with your set!

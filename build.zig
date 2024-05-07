@@ -6,11 +6,9 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
 
-    const ziglangSetMod = b.addModule("ziglang-set", .{
+    _ = b.addModule("ziglangSet", .{
         .root_source_file = .{.path = "src/set.zig"},
     });
-
-    _ = ziglangSetMod;
 
     const main_tests = b.addTest(.{
         .name = "ziglang-set tests",
