@@ -173,3 +173,9 @@ pub fn main() void {
 ```
 
 Check the tests for more comprehensive examples on how to use this package.
+
+#### Testing
+
+```sh
+zig build test
+```
