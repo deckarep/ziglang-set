@@ -65,8 +65,6 @@ pub fn Set(comptime E: type) type {
         pub fn init(allocator: std.mem.Allocator) Self {
             return .{
                 .map = Map.init(allocator),
-                //.map = selectMap(E).init(allocator),
-                //.map = Map.init(allocator),//std.AutoHashMap(E, void).init(allocator),
             };
         }
 
