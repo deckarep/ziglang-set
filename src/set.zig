@@ -90,6 +90,15 @@ pub fn Set(comptime E: type) type {
             return prevCount != self.map.count();
         }
 
+        /// Adds a single element to the set. Asserts that there is enough capacity.
+        /// A bool is returned indicating if the element was actually added
+        /// if not already known.
+        pub fn addAssumeCapacity(self: *Self, element: E) bool {
+            const prevCount = self.map.count();
+            self.map.putAssumeCapacity(element, {});
+            return prevCount != self.map.count();
+        }
+
         /// Appends all elements from the provided set, and may allocate.
         /// append returns an Allocator.Error or Size which represents how
         /// many elements added and not previously in the Set.
@@ -163,7 +172,8 @@ pub fn Set(comptime E: type) type {
             return self.map.contains(element);
         }
 
-        /// Returns true when all elements in the provided slice are present otherwise false.
+        /// Returns true when all elements in the other Set are present in this Set
+        /// otherwise false.
         pub fn containsAll(self: Self, other: Self) bool {
             var iter = other.iterator();
             while (iter.next()) |el| {
@@ -184,7 +194,8 @@ pub fn Set(comptime E: type) type {
             return true;
         }
 
-        /// Returns true when at least one or more elements exist within the Set otherwise false.
+        /// Returns true when at least one or more elements from the other Set exist within
+        /// this Set otherwise false.
         pub fn containsAny(self: Self, other: Self) bool {
             var iter = other.iterator();
             while (iter.next()) |el| {
@@ -195,7 +206,8 @@ pub fn Set(comptime E: type) type {
             return false;
         }
 
-        /// Returns true when at least one or more elements exist within the Set otherwise false.
+        /// Returns true when at least one or more elements from the slice exist within
+        /// this Set otherwise false.
         pub fn containsAnySlice(self: Self, elements: []const E) bool {
             for (elements) |el| {
                 if (self.map.contains(el)) {
@@ -412,8 +424,17 @@ pub fn Set(comptime E: type) type {
             return self.map.remove(element);
         }
 
-        /// removesAll discards all elements passed as a slice from the Set
-        pub fn removeAll(self: *Self, elements: []const E) void {
+        /// removesAll discards all elements passed from the other Set from
+        /// this Set
+        pub fn removeAll(self: *Self, other: Self) void {
+            var iter = other.iterator();
+            while (iter.next()) |el| {
+                _ = self.map.remove(el);
+            }
+        }
+
+        /// removesAllSlice discards all elements passed as a slice from the Set
+        pub fn removeAllSlice(self: *Self, elements: []const E) void {
             for (elements) |el| {
                 _ = self.map.remove(el);
             }
@@ -599,7 +620,7 @@ test "comprehensive usage" {
     try expect(!other.remove(55));
     try expect(!set.eql(other));
 
-    other.removeAll(&.{ 6, 7 });
+    other.removeAllSlice(&.{ 6, 7 });
     try expectEqual(other.cardinality(), 4);
 
     // intersectionOf
