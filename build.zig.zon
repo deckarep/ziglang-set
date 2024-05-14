@@ -10,5 +10,6 @@
         "build.zig",
         "build.zig.zon",
         "src/set.zig",
+        "src/unmanaged.zig",
     },
 }

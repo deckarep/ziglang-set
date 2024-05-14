@@ -81,6 +81,16 @@ pub fn SetUnmanaged(comptime E: type) type {
             return prevCount != self.unmanaged.count();
         }
 
+        /// Appends all elements from the provided set, and may allocate.
+        /// append returns an Allocator.Error or Size which represents how
+        /// many elements added and not previously in the Set.
+        pub fn append(self: *Self, allocator: Allocator, other: Self) Allocator.Error!Size {
+            const prevCount = self.unmanaged.count();
+
+            try self.unionUpdate(allocator, other);
+            return self.unmanaged.count() - prevCount;
+        }
+
         /// Appends all elements from the provided slice, and may allocate.
         /// appendSlice returns an Allocator.Error or Size which represents how
         /// many elements added and not previously in the slice.
@@ -92,9 +102,36 @@ pub fn SetUnmanaged(comptime E: type) type {
             return self.unmanaged.count() - prevCount;
         }
 
+        /// Returns the number of total elements which may be present before
+        /// it is no longer guaranteed that no allocations will be performed.
+        pub fn capacity(self: *Self) Size {
+            // Note: map.capacity() requires mutable access, probably an oversight.
+            return self.unmanaged.capacity();
+        }
+
         /// Cardinality effectively returns the size of the set.
         pub fn cardinality(self: Self) Size {
             return self.unmanaged.count();
+        }
+
+        /// Invalidates all element pointers.
+        pub fn clearAndFree(self: *Self, allocator: Allocator) void {
+            self.unmanaged.clearAndFree(allocator);
+        }
+
+        /// Invalidates all element pointers.
+        pub fn clearRetainingCapacity(self: *Self) void {
+            self.unmanaged.clearRetainingCapacity();
+        }
+
+        /// Creates a copy of this set, using the same allocator.
+        /// clone may return an Allocator.Error or the cloned Set.
+        pub fn clone(self: *Self, allocator: Allocator) Allocator.Error!Self {
+            // Take a stack copy of self.
+            var cloneSelf = self.*;
+            // Clone the interal map.
+            cloneSelf.map = try self.unmanaged.clone(allocator);
+            return cloneSelf;
         }
 
         /// Returns true when the provided element exists within the Set otherwise false.
@@ -147,6 +184,66 @@ pub fn SetUnmanaged(comptime E: type) type {
             return false;
         }
 
+        /// differenceOf returns the difference between this set
+        /// and other. The returned set will contain
+        /// all elements of this set that are not also
+        /// elements of the other.
+        ///
+        /// Caller owns the newly allocated/returned set.
+        pub fn differenceOf(self: Self, allocator: Allocator, other: Self) Allocator.Error!Self {
+            var diffSet = Self.init();
+
+            var iter = self.map.iterator();
+            while (iter.next()) |entry| {
+                if (!other.unmanaged.contains(entry.key_ptr.*)) {
+                    _ = try diffSet.add(allocator, entry.key_ptr.*);
+                }
+            }
+            return diffSet;
+        }
+
+        /// differenceUpdate does an in-place mutation of this set
+        /// and other. This set will contain all elements of this set that are not
+        /// also elements of other.
+        pub fn differenceUpdate(self: *Self, allocator: Allocator, other: Self) Allocator.Error!void {
+            // In-place mutation invalidates iterators therefore a temp set is needed.
+            // So instead of a temp set, just invoke the regular full function which
+            // allocates and returns a set then swap out the map internally.
+
+            // Also, this saves a step of not having to possibly discard many elements
+            // from the self set.
+
+            // Just get a new set with the normal method.
+            const diffSet = try self.differenceOf(allocator, other);
+
+            // Destroy the internal map.
+            self.unmanaged.deinit(allocator);
+
+            // Swap it out with the new set.
+            self.unmanaged = diffSet.unmanaged;
+        }
+
+        fn dump(self: Self) void {
+            std.log.err("\ncardinality: {d}\n", .{self.cardinality()});
+            var iter = self.iterator();
+            while (iter.next()) |el| {
+                std.log.err("  element: {d}\n", .{el.*});
+            }
+        }
+
+        /// Increases capacity, guaranteeing that insertions up until the
+        /// `expected_count` will not cause an allocation, and therefore cannot fail.
+        pub fn ensureTotalCapacity(self: *Self, allocator: Allocator, expected_count: Size) Allocator.Error!void {
+            return self.unmanaged.ensureTotalCapacity(allocator, expected_count);
+        }
+
+        /// Increases capacity, guaranteeing that insertions up until
+        /// `additional_count` **more** items will not cause an allocation, and
+        /// therefore cannot fail.
+        pub fn ensureUnusedCapacity(self: *Self, allocator: Allocator, additional_count: Size) Allocator.Error!void {
+            return self.unmanaged.ensureUnusedCapacity(allocator, additional_count);
+        }
+
         /// eql determines if two sets are equal to each
         /// other. If they have the same cardinality
         /// and contain the same elements, they are
@@ -170,6 +267,53 @@ pub fn SetUnmanaged(comptime E: type) type {
             return true;
         }
 
+        /// intersectionOf returns a new set containing only the elements
+        /// that exist only in both sets.
+        ///
+        /// Caller owns the newly allocated/returned set.
+        pub fn intersectionOf(self: Self, allocator: Allocator, other: Self) Allocator.Error!Self {
+            var interSet = Self.init();
+
+            // Optimization: iterate over whichever set is smaller.
+            // Matters when disparity in cardinality is large.
+            var s = other;
+            var o = self;
+            if (self.unmanaged.count() < other.unmanaged.count()) {
+                s = self;
+                o = other;
+            }
+
+            var iter = s.unmanaged.iterator();
+            while (iter.next()) |entry| {
+                if (o.unmanaged.contains(entry.key_ptr.*)) {
+                    _ = try interSet.add(allocator, entry.key_ptr.*);
+                }
+            }
+
+            return interSet;
+        }
+
+        /// intersectionUpdate does an in-place intersecting update
+        /// to the current set from the other set keeping only
+        /// elements found in this Set and the other Set.
+        pub fn intersectionUpdate(self: *Self, allocator: Allocator, other: Self) Allocator.Error!void {
+            // In-place mutation invalidates iterators therefore a temp set is needed.
+            // So instead of a temp set, just invoke the regular full function which
+            // allocates and returns a set then swap out the map internally.
+
+            // Also, this saves a step of not having to possibly discard many elements
+            // from the self set.
+
+            // Just get a new set with the normal method.
+            const interSet = try self.intersectionOf(allocator, other);
+
+            // Destroy the internal map.
+            self.map.deinit(allocator);
+
+            // Swap it out with the new set.
+            self.map = interSet.map;
+        }
+
         pub fn isEmpty(self: Self) bool {
             return self.unmanaged.count() == 0;
         }
@@ -178,6 +322,64 @@ pub fn SetUnmanaged(comptime E: type) type {
         /// The iterator is invalidated if the set is modified during iteration.
         pub fn iterator(self: Self) Iterator {
             return self.unmanaged.keyIterator();
+        }
+
+        /// properSubsetOf determines if every element in this set is in
+        /// the other set but the two sets are not equal.
+        pub fn properSubsetOf(self: Self, other: Self) bool {
+            return self.unmanaged.count() < other.unmanaged.count() and self.subsetOf(other);
+        }
+
+        /// properSupersetOf determines if every element in the other set
+        /// is in this set but the two sets are not equal.
+        pub fn properSupersetOf(self: Self, other: Self) bool {
+            return self.unmanaged.count() > other.unmanaged.count() and self.supersetOf(other);
+        }
+
+        /// subsetOf determines if every element in this set is in
+        /// the other set.
+        pub fn subsetOf(self: Self, other: Self) bool {
+            // First discriminate on cardinalties of both sets.
+            if (self.unmanaged.count() > other.unmanaged.count()) {
+                return false;
+            }
+
+            // Now check that self set has at least some elements from other.
+            var iter = self.unmanaged.iterator();
+            while (iter.next()) |entry| {
+                if (!other.unmanaged.contains(entry.key_ptr.*)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// subsetOf determines if every element in the other Set is in
+        /// the this Set.
+        pub fn supersetOf(self: Self, other: Self) bool {
+            // This is just the converse of subsetOf.
+            return other.subsetOf(self);
+        }
+
+        /// pop removes and returns an arbitrary ?E from the set.
+        /// Order is not guaranteed.
+        /// This safely returns null if the Set is empty.
+        pub fn pop(self: *Self) ?E {
+            if (self.unmanaged.count() > 0) {
+                var iter = self.unmanaged.iterator();
+                // NOTE: No in-place mutation as it invalidates live iterators.
+                // So a temporary capture is taken.
+                var capturedElement: E = undefined;
+                while (iter.next()) |entry| {
+                    capturedElement = entry.key_ptr.*;
+                    break;
+                }
+                _ = self.unmanaged.remove(capturedElement);
+                return capturedElement;
+            } else {
+                return null;
+            }
         }
 
         /// remove discards a single element from the Set
@@ -199,6 +401,50 @@ pub fn SetUnmanaged(comptime E: type) type {
             for (elements) |el| {
                 _ = self.unmanaged.remove(el);
             }
+        }
+
+        /// symmetricDifferenceOf returns a new set with all elements which are
+        /// in either this set or the other set but not in both.
+        ///
+        /// The caller owns the newly allocated/returned Set.
+        pub fn symmetricDifferenceOf(self: Self, allocator: Allocator, other: Self) Allocator.Error!Self {
+            var sdSet = Self.init();
+
+            var iter = self.unmanaged.iterator();
+            while (iter.next()) |entry| {
+                if (!other.unmanaged.contains(entry.key_ptr.*)) {
+                    _ = try sdSet.add(allocator, entry.key_ptr.*);
+                }
+            }
+
+            iter = other.unmanaged.iterator();
+            while (iter.next()) |entry| {
+                if (!self.unmanaged.contains(entry.key_ptr.*)) {
+                    _ = try sdSet.add(allocator, entry.key_ptr.*);
+                }
+            }
+
+            return sdSet;
+        }
+
+        /// symmetricDifferenceUpdate does an in-place mutation with all elements
+        /// which are in either this set or the other set but not in both.
+        pub fn symmetricDifferenceUpdate(self: *Self, allocator: Allocator, other: Self) Allocator.Error!void {
+            // In-place mutation invalidates iterators therefore a temp set is needed.
+            // So instead of a temp set, just invoke the regular full function which
+            // allocates and returns a set then swap out the map internally.
+
+            // Also, this saves a step of not having to possibly discard many elements
+            // from the self set.
+
+            // Just get a new set with the normal method.
+            const sd = try self.symmetricDifferenceOf(allocator, other);
+
+            // Destroy the internal map.
+            self.map.deinit(allocator);
+
+            // Swap it out with the new set.
+            self.map = sd.map;
         }
 
         /// union returns a new set with all elements in both sets.
@@ -274,4 +520,20 @@ test "example usage" {
     while (iter.next()) |el| {
         std.log.debug("element: {d}", .{el.*});
     }
+}
+
+test "string usage" {
+    var A = SetUnmanaged([]const u8).init();
+    defer A.deinit(testing.allocator);
+
+    var B = SetUnmanaged([]const u8).init();
+    defer B.deinit(testing.allocator);
+
+    _ = try A.add(testing.allocator, "Hello");
+    _ = try B.add(testing.allocator, "World");
+
+    var C = try A.unionOf(testing.allocator, B);
+    defer C.deinit(testing.allocator);
+    try expectEqual(2, C.cardinality());
+    try expect(C.containsAllSlice(&.{ "Hello", "World" }));
 }

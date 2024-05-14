@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
 
     _ = b.addModule("ziglangSet", .{
-        .root_source_file = .{.path = "src/set.zig"},
+        .root_source_file = .{ .path = "src/set.zig" },
     });
 
     const main_tests = b.addTest(.{
