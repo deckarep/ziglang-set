@@ -30,6 +30,9 @@ This implementation gives credit and acknowledgement to the [Zig language](https
 
 #### Features
   * Offers idiomatic, generic-based Zig API - allocators, iterators, capacity hints, clearing, resizing, etc.
+  * A few flavors to choose from
+    * SetManaged - initializes with an allocator and holds it internally (built on top of unmanaged)
+    * SetUnmanaged - does not hold an allocator, optimized when storing many Sets
   * Common set operations
     * add, append, appendSlice
     * remove, removeAll
