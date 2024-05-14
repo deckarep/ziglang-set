@@ -130,7 +130,7 @@ pub fn SetUnmanaged(comptime E: type) type {
             // Take a stack copy of self.
             var cloneSelf = self.*;
             // Clone the interal map.
-            cloneSelf.map = try self.unmanaged.clone(allocator);
+            cloneSelf.unmanaged = try self.unmanaged.clone(allocator);
             return cloneSelf;
         }
 
@@ -536,6 +536,19 @@ test "string usage" {
     defer C.deinit(testing.allocator);
     try expectEqual(2, C.cardinality());
     try expect(C.containsAllSlice(&.{ "Hello", "World" }));
+}
+
+test "clone" {
+
+    // clone
+    var a = SetUnmanaged(u32).init();
+    defer a.deinit(testing.allocator);
+    _ = try a.appendSlice(testing.allocator, &.{ 20, 30, 40 });
+
+    var b = try a.clone(testing.allocator);
+    defer b.deinit(testing.allocator);
+
+    try expect(a.eql(b));
 }
 
 test "clear/capacity" {
