@@ -193,7 +193,7 @@ pub fn SetUnmanaged(comptime E: type) type {
         pub fn differenceOf(self: Self, allocator: Allocator, other: Self) Allocator.Error!Self {
             var diffSet = Self.init();
 
-            var iter = self.map.iterator();
+            var iter = self.unmanaged.iterator();
             while (iter.next()) |entry| {
                 if (!other.unmanaged.contains(entry.key_ptr.*)) {
                     _ = try diffSet.add(allocator, entry.key_ptr.*);
@@ -308,10 +308,10 @@ pub fn SetUnmanaged(comptime E: type) type {
             const interSet = try self.intersectionOf(allocator, other);
 
             // Destroy the internal map.
-            self.map.deinit(allocator);
+            self.unmanaged.deinit(allocator);
 
             // Swap it out with the new set.
-            self.map = interSet.map;
+            self.unmanaged = interSet.unmanaged;
         }
 
         pub fn isEmpty(self: Self) bool {
@@ -441,10 +441,10 @@ pub fn SetUnmanaged(comptime E: type) type {
             const sd = try self.symmetricDifferenceOf(allocator, other);
 
             // Destroy the internal map.
-            self.map.deinit(allocator);
+            self.unmanaged.deinit(allocator);
 
             // Swap it out with the new set.
-            self.map = sd.map;
+            self.unmanaged = sd.unmanaged;
         }
 
         /// union returns a new set with all elements in both sets.
@@ -616,4 +616,60 @@ test "pop" {
 
     // Lastly, pop should safely return null.
     try expect(a.pop() == null);
+}
+
+test "in-place methods" {
+    // intersectionUpdate
+    var a = SetUnmanaged(u32).init();
+    defer a.deinit(testing.allocator);
+    _ = try a.appendSlice(testing.allocator, &.{ 10, 20, 30, 40 });
+
+    var b = SetUnmanaged(u32).init();
+    defer b.deinit(testing.allocator);
+    _ = try b.appendSlice(testing.allocator, &.{ 44, 20, 30, 66 });
+
+    try a.intersectionUpdate(testing.allocator, b);
+    try expectEqual(a.cardinality(), 2);
+    try expect(a.containsAllSlice(&.{ 20, 30 }));
+
+    // unionUpdate
+    var c = SetUnmanaged(u32).init();
+    defer c.deinit(testing.allocator);
+    _ = try c.appendSlice(testing.allocator, &.{ 10, 20, 30, 40 });
+
+    var d = SetUnmanaged(u32).init();
+    defer d.deinit(testing.allocator);
+    _ = try d.appendSlice(testing.allocator, &.{ 44, 20, 30, 66 });
+
+    try c.unionUpdate(testing.allocator, d);
+    try expectEqual(c.cardinality(), 6);
+    try expect(c.containsAllSlice(&.{ 10, 20, 30, 40, 66 }));
+
+    // differenceUpdate
+    var e = SetUnmanaged(u32).init();
+    defer e.deinit(testing.allocator);
+    _ = try e.appendSlice(testing.allocator, &.{ 1, 11, 111, 1111, 11111 });
+
+    var f = SetUnmanaged(u32).init();
+    defer f.deinit(testing.allocator);
+    _ = try f.appendSlice(testing.allocator, &.{ 1, 11, 111, 222, 2222, 1111 });
+
+    try e.differenceUpdate(testing.allocator, f);
+
+    try expectEqual(1, e.cardinality());
+    try expect(e.contains(11111));
+
+    // symmetricDifferenceUpdate
+    var g = SetUnmanaged(u32).init();
+    defer g.deinit(testing.allocator);
+    _ = try g.appendSlice(testing.allocator, &.{ 2, 22, 222, 2222, 22222 });
+
+    var h = SetUnmanaged(u32).init();
+    defer h.deinit(testing.allocator);
+    _ = try h.appendSlice(testing.allocator, &.{ 1, 11, 111, 333, 3333, 2222, 1111 });
+
+    try g.symmetricDifferenceUpdate(testing.allocator, h);
+
+    try expectEqual(10, g.cardinality());
+    try expect(g.containsAllSlice(&.{ 1, 2, 11, 111, 22, 222, 1111, 333, 3333, 22222 }));
 }
