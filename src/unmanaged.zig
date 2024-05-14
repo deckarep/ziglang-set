@@ -537,3 +537,70 @@ test "string usage" {
     try expectEqual(2, C.cardinality());
     try expect(C.containsAllSlice(&.{ "Hello", "World" }));
 }
+
+test "clear/capacity" {
+    var a = SetUnmanaged(u32).init();
+    defer a.deinit(testing.allocator);
+
+    try expectEqual(0, a.cardinality());
+    try expectEqual(0, a.capacity());
+
+    const cap = 99;
+    var b = try SetUnmanaged(u32).initCapacity(testing.allocator, cap);
+    defer b.deinit(testing.allocator);
+
+    try expectEqual(0, b.cardinality());
+    try expect(b.capacity() >= cap);
+
+    for (0..cap) |val| {
+        _ = try b.add(testing.allocator, @intCast(val));
+    }
+
+    try expectEqual(99, b.cardinality());
+    try expect(b.capacity() >= cap);
+
+    b.clearRetainingCapacity();
+
+    try expectEqual(0, b.cardinality());
+    try expect(b.capacity() >= cap);
+
+    b.clearAndFree(testing.allocator);
+
+    try expectEqual(0, b.cardinality());
+    try expectEqual(b.capacity(), 0);
+}
+
+test "iterator" {
+    var a = SetUnmanaged(u32).init();
+    defer a.deinit(testing.allocator);
+    _ = try a.appendSlice(testing.allocator, &.{ 20, 30, 40 });
+
+    var sum: u32 = 0;
+    var iterCount: usize = 0;
+    var iter = a.iterator();
+    while (iter.next()) |el| {
+        sum += el.*;
+        iterCount += 1;
+    }
+
+    try expectEqual(90, sum);
+    try expectEqual(3, iterCount);
+}
+
+test "pop" {
+    var a = SetUnmanaged(u32).init();
+    defer a.deinit(testing.allocator);
+    _ = try a.appendSlice(testing.allocator, &.{ 20, 30, 40 });
+
+    // No assumptions can be made about pop order.
+    while (a.pop()) |result| {
+        try expect(result == 20 or result == 30 or result == 40);
+    }
+
+    // At this point, set must be empty.
+    try expectEqual(a.cardinality(), 0);
+    try expect(a.isEmpty());
+
+    // Lastly, pop should safely return null.
+    try expect(a.pop() == null);
+}
