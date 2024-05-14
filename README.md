@@ -13,6 +13,11 @@ Ziglang-Set: a generic and general-purpose Set implementation for Zig. <br/> ğŸš
 </p>
 
 #
+<p align="center">
+  <a href="https://deckarep.github.io/ziglang-set/"><img src="https://img.shields.io/badge/api-reference-blue.svg?style=flat-square" alt="API Reference"></a>
+</p>
+
+#
 
 Zig currently [does not have](https://github.com/ziglang/zig/issues/6919) a built-in, general purpose Set data structure at this point in time. Until it does, try this!
 
