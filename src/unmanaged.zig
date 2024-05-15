@@ -538,6 +538,89 @@ test "string usage" {
     try expect(C.containsAllSlice(&.{ "Hello", "World" }));
 }
 
+test "comprehensive usage" {
+    var set = SetUnmanaged(u32).init();
+    defer set.deinit(testing.allocator);
+
+    try expect(set.isEmpty());
+
+    _ = try set.add(testing.allocator, 8);
+    _ = try set.add(testing.allocator, 6);
+    _ = try set.add(testing.allocator, 7);
+    try expectEqual(set.cardinality(), 3);
+
+    _ = try set.appendSlice(testing.allocator, &.{ 5, 3, 0, 9 });
+
+    // Positive cases.
+    try expect(set.contains(8));
+    try expect(set.containsAllSlice(&.{ 5, 3, 9 }));
+    try expect(set.containsAnySlice(&.{ 5, 55, 12 }));
+
+    // Negative cases.
+    try expect(!set.contains(99));
+    try expect(!set.containsAllSlice(&.{ 8, 6, 77 }));
+    try expect(!set.containsAnySlice(&.{ 99, 55, 44 }));
+
+    try expectEqual(set.cardinality(), 7);
+
+    var other = SetUnmanaged(u32).init();
+    defer other.deinit(testing.allocator);
+
+    try expect(other.isEmpty());
+
+    _ = try other.add(testing.allocator, 8);
+    _ = try other.add(testing.allocator, 6);
+    _ = try other.add(testing.allocator, 7);
+
+    _ = try other.appendSlice(testing.allocator, &.{ 5, 3, 0, 9 });
+
+    try expect(set.eql(other));
+    try expectEqual(other.cardinality(), 7);
+
+    try expect(other.remove(8));
+    try expectEqual(other.cardinality(), 6);
+    try expect(!other.remove(55));
+    try expect(!set.eql(other));
+
+    other.removeAllSlice(&.{ 6, 7 });
+    try expectEqual(other.cardinality(), 4);
+
+    // intersectionOf
+    var inter = try set.intersectionOf(testing.allocator, other);
+    defer inter.deinit(testing.allocator);
+    try expect(!inter.isEmpty());
+    try expectEqual(inter.cardinality(), 4);
+    try expect(inter.containsAllSlice(&.{ 5, 3, 0, 9 }));
+
+    // Union
+    var un = try set.unionOf(testing.allocator, other);
+    defer un.deinit(testing.allocator);
+    try expect(!un.isEmpty());
+    try expectEqual(un.cardinality(), 7);
+    try expect(un.containsAllSlice(&.{ 8, 6, 7, 5, 3, 0, 9 }));
+
+    // differenceOf
+    var diff = try set.differenceOf(testing.allocator, other);
+    defer diff.deinit(testing.allocator);
+    try expect(!diff.isEmpty());
+    try expectEqual(diff.cardinality(), 3);
+    try expect(diff.containsAllSlice(&.{ 8, 7, 6 }));
+
+    // symmetricDifferenceOf
+    _ = try set.add(testing.allocator, 11111);
+    _ = try set.add(testing.allocator, 9999);
+    _ = try other.add(testing.allocator, 7777);
+    var symmDiff = try set.symmetricDifferenceOf(testing.allocator, other);
+    defer symmDiff.deinit(testing.allocator);
+    try expect(!symmDiff.isEmpty());
+    try expectEqual(symmDiff.cardinality(), 6);
+    try expect(symmDiff.containsAllSlice(&.{ 7777, 11111, 8, 7, 6, 9999 }));
+
+    // subsetOf
+
+    // supersetOf
+}
+
 test "clone" {
 
     // clone
