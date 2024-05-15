@@ -756,3 +756,11 @@ test "in-place methods" {
     try expectEqual(10, g.cardinality());
     try expect(g.containsAllSlice(&.{ 1, 2, 11, 111, 22, 222, 1111, 333, 3333, 22222 }));
 }
+
+test "sizeOf matches" {
+    // No bloat guarantee, after all we're just building on top of what's good.
+    // "What's good Miley!?!?""
+    const expectedByteSize = 24;
+    try expectEqual(expectedByteSize, @sizeOf(std.hash_map.AutoHashMapUnmanaged(u32, void)));
+    try expectEqual(expectedByteSize, @sizeOf(SetUnmanaged(u32)));
+}
