@@ -22,7 +22,7 @@ const std = @import("std");
 const mem = std.mem;
 const Allocator = mem.Allocator;
 
-// comptime selection of the map type for string vs everything else.
+/// comptime selection of the map type for string vs everything else.
 fn selectMap(comptime E: type) type {
     comptime {
         if (E == []const u8) {
@@ -33,6 +33,10 @@ fn selectMap(comptime E: type) type {
     }
 }
 
+/// SetUnmanaged is an implementation of a Set where there is no internal
+/// allocator and all allocating methods require a first argument allocator.
+/// This is a more compact Set built on top of the the HashMapUnmanaged
+/// datastructure.
 pub fn SetUnmanaged(comptime E: type) type {
     return struct {
         /// The type of the internal hash map

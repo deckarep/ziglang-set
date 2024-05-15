@@ -22,7 +22,7 @@ const std = @import("std");
 const mem = std.mem;
 const Allocator = mem.Allocator;
 
-// comptime selection of the map type for string vs everything else.
+/// comptime selection of the map type for string vs everything else.
 fn selectMap(comptime E: type) type {
     comptime {
         if (E == []const u8) {
