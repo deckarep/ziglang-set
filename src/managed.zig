@@ -24,17 +24,6 @@ const mem = std.mem;
 const Allocator = mem.Allocator;
 const SetUnmanaged = @import("unmanaged.zig").SetUnmanaged;
 
-// /// comptime selection of the map type for string vs everything else.
-// fn selectMap(comptime E: type) type {
-//     comptime {
-//         if (E == []const u8) {
-//             return std.StringHashMap(void);
-//         } else {
-//             return std.AutoHashMap(E, void);
-//         }
-//     }
-// }
-
 /// fn SetManaged(E) creates a set based on element type E.
 /// This implementation is backed by the std.AutoHashMap implementation
 /// where a Value is not needed and considered to be void and
@@ -843,10 +832,12 @@ test "in-place methods" {
     try expect(g.containsAllSlice(&.{ 1, 2, 11, 111, 22, 222, 1111, 333, 3333, 22222 }));
 }
 
-// test "sizeOf" {
-//     // Instead of the Set having it's own allocator it just borrows the internal map.
-//     // This is to keep the object size the same as the AudoHashMap.
-//     const expectedByteSize = 40;
-//     try expectEqual(expectedByteSize, @sizeOf(std.hash_map.AutoHashMap(u32, void)));
-//     try expectEqual(expectedByteSize, @sizeOf(Set(u32)));
-// }
+test "sizeOf" {
+    const unmanagedSize = @sizeOf(SetUnmanaged(u32));
+    const managedSize = @sizeOf(SetManaged(u32));
+
+    // The managed must be only 16 bytes larger, the cost of the internal allocator
+    // otherwise we've added some CRAP!
+    const expectedDiff = 16;
+    try expectEqual(expectedDiff, managedSize - unmanagedSize);
+}
