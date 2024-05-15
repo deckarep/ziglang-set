@@ -19,10 +19,11 @@
 ///
 ///
 
-// SetUnmanaged is a conveniently exported "unmanaged" version of the Set.
+/// SetUnmanaged is a conveniently exported "unmanaged" version of the Set.
 const SetUnmanaged = @import("unmanaged.zig").SetUnmanaged;
-// SetManaged is a conveniently exported "managed" version of the Set.
+/// SetManaged is a conveniently exported "managed" version of the Set.
 const SetManaged = @import("managed.zig").SetManaged;
 
-// Set is just a short convenient "default" alias.
+/// Set is just a short convenient "default" alias. If you don't know
+/// which to pick, just use this one.
 const Set = SetManaged;
