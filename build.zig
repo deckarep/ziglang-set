@@ -21,14 +21,14 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&run_main_tests.step);
 
-     // Below is for docs generation.
+    // Below is for docs generation.
     const lib = b.addObject(.{
         .name = "ziglang-set",
         .root_source_file = b.path("src/set.zig"),
         .target = target,
         .optimize = optimize,
     });
-    
+
     const my_docs = lib;
     const build_docs = b.addInstallDirectory(.{
         .source_dir = my_docs.getEmittedDocs(),
