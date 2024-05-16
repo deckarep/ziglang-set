@@ -9,8 +9,8 @@
         "LICENSE",
         "build.zig",
         "build.zig.zon",
-        "src/managed.zig",
-        "src/set.zig",
-        "src/unmanaged.zig",
+        "src/hashset/managed.zig",
+        "src/hashset/unmanaged.zig",
+        "src/root.zig",
     },
 }

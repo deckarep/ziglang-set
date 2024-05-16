@@ -33,11 +33,11 @@ fn selectMap(comptime E: type) type {
     }
 }
 
-/// SetUnmanaged is an implementation of a Set where there is no internal
+/// HashSetUnmanaged is an implementation of a Set where there is no internal
 /// allocator and all allocating methods require a first argument allocator.
 /// This is a more compact Set built on top of the the HashMapUnmanaged
 /// datastructure.
-pub fn SetUnmanaged(comptime E: type) type {
+pub fn HashSetUnmanaged(comptime E: type) type {
     return struct {
         /// The type of the internal hash map
         pub const Map = selectMap(E);
@@ -495,7 +495,7 @@ const expectEqual = std.testing.expectEqual;
 
 test "example usage" {
     // Create a set of u32s called A
-    var A = SetUnmanaged(u32).init();
+    var A = HashSetUnmanaged(u32).init();
     defer A.deinit(testing.allocator);
 
     // Add some data
@@ -507,7 +507,7 @@ test "example usage" {
     _ = try A.appendSlice(testing.allocator, &.{ 5, 3, 0, 9 });
 
     // Create another set called B
-    var B = SetUnmanaged(u32).init();
+    var B = HashSetUnmanaged(u32).init();
     defer B.deinit(testing.allocator);
 
     // Add data to B
@@ -527,10 +527,10 @@ test "example usage" {
 }
 
 test "string usage" {
-    var A = SetUnmanaged([]const u8).init();
+    var A = HashSetUnmanaged([]const u8).init();
     defer A.deinit(testing.allocator);
 
-    var B = SetUnmanaged([]const u8).init();
+    var B = HashSetUnmanaged([]const u8).init();
     defer B.deinit(testing.allocator);
 
     _ = try A.add(testing.allocator, "Hello");
@@ -543,7 +543,7 @@ test "string usage" {
 }
 
 test "comprehensive usage" {
-    var set = SetUnmanaged(u32).init();
+    var set = HashSetUnmanaged(u32).init();
     defer set.deinit(testing.allocator);
 
     try expect(set.isEmpty());
@@ -567,7 +567,7 @@ test "comprehensive usage" {
 
     try expectEqual(set.cardinality(), 7);
 
-    var other = SetUnmanaged(u32).init();
+    var other = HashSetUnmanaged(u32).init();
     defer other.deinit(testing.allocator);
 
     try expect(other.isEmpty());
@@ -628,7 +628,7 @@ test "comprehensive usage" {
 test "clone" {
 
     // clone
-    var a = SetUnmanaged(u32).init();
+    var a = HashSetUnmanaged(u32).init();
     defer a.deinit(testing.allocator);
     _ = try a.appendSlice(testing.allocator, &.{ 20, 30, 40 });
 
@@ -639,14 +639,14 @@ test "clone" {
 }
 
 test "clear/capacity" {
-    var a = SetUnmanaged(u32).init();
+    var a = HashSetUnmanaged(u32).init();
     defer a.deinit(testing.allocator);
 
     try expectEqual(0, a.cardinality());
     try expectEqual(0, a.capacity());
 
     const cap = 99;
-    var b = try SetUnmanaged(u32).initCapacity(testing.allocator, cap);
+    var b = try HashSetUnmanaged(u32).initCapacity(testing.allocator, cap);
     defer b.deinit(testing.allocator);
 
     try expectEqual(0, b.cardinality());
@@ -671,7 +671,7 @@ test "clear/capacity" {
 }
 
 test "iterator" {
-    var a = SetUnmanaged(u32).init();
+    var a = HashSetUnmanaged(u32).init();
     defer a.deinit(testing.allocator);
     _ = try a.appendSlice(testing.allocator, &.{ 20, 30, 40 });
 
@@ -688,7 +688,7 @@ test "iterator" {
 }
 
 test "pop" {
-    var a = SetUnmanaged(u32).init();
+    var a = HashSetUnmanaged(u32).init();
     defer a.deinit(testing.allocator);
     _ = try a.appendSlice(testing.allocator, &.{ 20, 30, 40 });
 
@@ -707,11 +707,11 @@ test "pop" {
 
 test "in-place methods" {
     // intersectionUpdate
-    var a = SetUnmanaged(u32).init();
+    var a = HashSetUnmanaged(u32).init();
     defer a.deinit(testing.allocator);
     _ = try a.appendSlice(testing.allocator, &.{ 10, 20, 30, 40 });
 
-    var b = SetUnmanaged(u32).init();
+    var b = HashSetUnmanaged(u32).init();
     defer b.deinit(testing.allocator);
     _ = try b.appendSlice(testing.allocator, &.{ 44, 20, 30, 66 });
 
@@ -720,11 +720,11 @@ test "in-place methods" {
     try expect(a.containsAllSlice(&.{ 20, 30 }));
 
     // unionUpdate
-    var c = SetUnmanaged(u32).init();
+    var c = HashSetUnmanaged(u32).init();
     defer c.deinit(testing.allocator);
     _ = try c.appendSlice(testing.allocator, &.{ 10, 20, 30, 40 });
 
-    var d = SetUnmanaged(u32).init();
+    var d = HashSetUnmanaged(u32).init();
     defer d.deinit(testing.allocator);
     _ = try d.appendSlice(testing.allocator, &.{ 44, 20, 30, 66 });
 
@@ -733,11 +733,11 @@ test "in-place methods" {
     try expect(c.containsAllSlice(&.{ 10, 20, 30, 40, 66 }));
 
     // differenceUpdate
-    var e = SetUnmanaged(u32).init();
+    var e = HashSetUnmanaged(u32).init();
     defer e.deinit(testing.allocator);
     _ = try e.appendSlice(testing.allocator, &.{ 1, 11, 111, 1111, 11111 });
 
-    var f = SetUnmanaged(u32).init();
+    var f = HashSetUnmanaged(u32).init();
     defer f.deinit(testing.allocator);
     _ = try f.appendSlice(testing.allocator, &.{ 1, 11, 111, 222, 2222, 1111 });
 
@@ -747,11 +747,11 @@ test "in-place methods" {
     try expect(e.contains(11111));
 
     // symmetricDifferenceUpdate
-    var g = SetUnmanaged(u32).init();
+    var g = HashSetUnmanaged(u32).init();
     defer g.deinit(testing.allocator);
     _ = try g.appendSlice(testing.allocator, &.{ 2, 22, 222, 2222, 22222 });
 
-    var h = SetUnmanaged(u32).init();
+    var h = HashSetUnmanaged(u32).init();
     defer h.deinit(testing.allocator);
     _ = try h.appendSlice(testing.allocator, &.{ 1, 11, 111, 333, 3333, 2222, 1111 });
 
@@ -766,5 +766,5 @@ test "sizeOf matches" {
     // "What's good Miley!?!?""
     const expectedByteSize = 24;
     try expectEqual(expectedByteSize, @sizeOf(std.hash_map.AutoHashMapUnmanaged(u32, void)));
-    try expectEqual(expectedByteSize, @sizeOf(SetUnmanaged(u32)));
+    try expectEqual(expectedByteSize, @sizeOf(HashSetUnmanaged(u32)));
 }

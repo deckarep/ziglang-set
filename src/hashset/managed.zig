@@ -22,15 +22,15 @@
 const std = @import("std");
 const mem = std.mem;
 const Allocator = mem.Allocator;
-const SetUnmanaged = @import("unmanaged.zig").SetUnmanaged;
+const SetUnmanaged = @import("unmanaged.zig").HashSetUnmanaged;
 
-/// fn SetManaged(E) creates a set based on element type E.
+/// fn HashSetManaged(E) creates a set based on element type E.
 /// This implementation is backed by the std.AutoHashMap implementation
 /// where a Value is not needed and considered to be void and
 /// a Key is considered to be a Set element of type E.
 /// The Set comes complete with the common set operations expected
 /// in a comprehensive set-based data-structure.
-pub fn SetManaged(comptime E: type) type {
+pub fn HashSetManaged(comptime E: type) type {
     return struct {
         allocator: std.mem.Allocator,
 
@@ -505,7 +505,7 @@ test "example usage" {
     // const set = @import("set.zig");
 
     // Create a set of u32s called A
-    var A = SetManaged(u32).init(std.testing.allocator);
+    var A = HashSetManaged(u32).init(std.testing.allocator);
     defer A.deinit();
 
     // Add some data
@@ -517,7 +517,7 @@ test "example usage" {
     _ = try A.appendSlice(&.{ 5, 3, 0, 9 });
 
     // Create another set called B
-    var B = SetManaged(u32).init(std.testing.allocator);
+    var B = HashSetManaged(u32).init(std.testing.allocator);
     defer B.deinit();
 
     // Add data to B
@@ -535,10 +535,10 @@ test "example usage" {
 }
 
 test "string usage" {
-    var A = SetManaged([]const u8).init(std.testing.allocator);
+    var A = HashSetManaged([]const u8).init(std.testing.allocator);
     defer A.deinit();
 
-    var B = SetManaged([]const u8).init(std.testing.allocator);
+    var B = HashSetManaged([]const u8).init(std.testing.allocator);
     defer B.deinit();
 
     _ = try A.add("Hello");
@@ -551,7 +551,7 @@ test "string usage" {
 }
 
 test "comprehensive usage" {
-    var set = SetManaged(u32).init(std.testing.allocator);
+    var set = HashSetManaged(u32).init(std.testing.allocator);
     defer set.deinit();
 
     try expect(set.isEmpty());
@@ -575,7 +575,7 @@ test "comprehensive usage" {
 
     try expectEqual(set.cardinality(), 7);
 
-    var other = SetManaged(u32).init(std.testing.allocator);
+    var other = HashSetManaged(u32).init(std.testing.allocator);
     defer other.deinit();
 
     try expect(other.isEmpty());
@@ -634,14 +634,14 @@ test "comprehensive usage" {
 }
 
 test "clear/capacity" {
-    var a = SetManaged(u32).init(std.testing.allocator);
+    var a = HashSetManaged(u32).init(std.testing.allocator);
     defer a.deinit();
 
     try expectEqual(0, a.cardinality());
     try expectEqual(0, a.capacity());
 
     const cap = 99;
-    var b = try SetManaged(u32).initCapacity(std.testing.allocator, cap);
+    var b = try HashSetManaged(u32).initCapacity(std.testing.allocator, cap);
     defer b.deinit();
 
     try expectEqual(0, b.cardinality());
@@ -668,7 +668,7 @@ test "clear/capacity" {
 test "clone" {
     {
         // clone
-        var a = SetManaged(u32).init(std.testing.allocator);
+        var a = HashSetManaged(u32).init(std.testing.allocator);
         defer a.deinit();
         _ = try a.appendSlice(&.{ 20, 30, 40 });
 
@@ -680,7 +680,7 @@ test "clone" {
 
     {
         // cloneWithAllocator
-        var a = SetManaged(u32).init(std.testing.allocator);
+        var a = HashSetManaged(u32).init(std.testing.allocator);
         defer a.deinit();
         _ = try a.appendSlice(&.{ 20, 30, 40 });
 
@@ -702,7 +702,7 @@ test "clone" {
 }
 
 test "pop" {
-    var a = SetManaged(u32).init(std.testing.allocator);
+    var a = HashSetManaged(u32).init(std.testing.allocator);
     defer a.deinit();
     _ = try a.appendSlice(&.{ 20, 30, 40 });
 
@@ -722,11 +722,11 @@ test "pop" {
 test "subset/superset" {
     {
         // subsetOf
-        var a = SetManaged(u32).init(std.testing.allocator);
+        var a = HashSetManaged(u32).init(std.testing.allocator);
         defer a.deinit();
         _ = try a.appendSlice(&.{ 1, 2, 3, 5, 7 });
 
-        var b = SetManaged(u32).init(std.testing.allocator);
+        var b = HashSetManaged(u32).init(std.testing.allocator);
         defer b.deinit();
 
         // b should be a subset of a.
@@ -740,11 +740,11 @@ test "subset/superset" {
 
     {
         // supersetOf
-        var a = SetManaged(u32).init(std.testing.allocator);
+        var a = HashSetManaged(u32).init(std.testing.allocator);
         defer a.deinit();
         _ = try a.appendSlice(&.{ 9, 5, 2, 1, 11 });
 
-        var b = SetManaged(u32).init(std.testing.allocator);
+        var b = HashSetManaged(u32).init(std.testing.allocator);
         defer b.deinit();
         _ = try b.appendSlice(&.{ 5, 2, 11 });
 
@@ -760,7 +760,7 @@ test "subset/superset" {
 }
 
 test "iterator" {
-    var a = SetManaged(u32).init(std.testing.allocator);
+    var a = HashSetManaged(u32).init(std.testing.allocator);
     defer a.deinit();
     _ = try a.appendSlice(&.{ 20, 30, 40 });
 
@@ -778,11 +778,11 @@ test "iterator" {
 
 test "in-place methods" {
     // intersectionUpdate
-    var a = SetManaged(u32).init(std.testing.allocator);
+    var a = HashSetManaged(u32).init(std.testing.allocator);
     defer a.deinit();
     _ = try a.appendSlice(&.{ 10, 20, 30, 40 });
 
-    var b = SetManaged(u32).init(std.testing.allocator);
+    var b = HashSetManaged(u32).init(std.testing.allocator);
     defer b.deinit();
     _ = try b.appendSlice(&.{ 44, 20, 30, 66 });
 
@@ -791,11 +791,11 @@ test "in-place methods" {
     try expect(a.containsAllSlice(&.{ 20, 30 }));
 
     // unionUpdate
-    var c = SetManaged(u32).init(std.testing.allocator);
+    var c = HashSetManaged(u32).init(std.testing.allocator);
     defer c.deinit();
     _ = try c.appendSlice(&.{ 10, 20, 30, 40 });
 
-    var d = SetManaged(u32).init(std.testing.allocator);
+    var d = HashSetManaged(u32).init(std.testing.allocator);
     defer d.deinit();
     _ = try d.appendSlice(&.{ 44, 20, 30, 66 });
 
@@ -804,11 +804,11 @@ test "in-place methods" {
     try expect(c.containsAllSlice(&.{ 10, 20, 30, 40, 66 }));
 
     // differenceUpdate
-    var e = SetManaged(u32).init(std.testing.allocator);
+    var e = HashSetManaged(u32).init(std.testing.allocator);
     defer e.deinit();
     _ = try e.appendSlice(&.{ 1, 11, 111, 1111, 11111 });
 
-    var f = SetManaged(u32).init(std.testing.allocator);
+    var f = HashSetManaged(u32).init(std.testing.allocator);
     defer f.deinit();
     _ = try f.appendSlice(&.{ 1, 11, 111, 222, 2222, 1111 });
 
@@ -818,11 +818,11 @@ test "in-place methods" {
     try expect(e.contains(11111));
 
     // symmetricDifferenceUpdate
-    var g = SetManaged(u32).init(std.testing.allocator);
+    var g = HashSetManaged(u32).init(std.testing.allocator);
     defer g.deinit();
     _ = try g.appendSlice(&.{ 2, 22, 222, 2222, 22222 });
 
-    var h = SetManaged(u32).init(std.testing.allocator);
+    var h = HashSetManaged(u32).init(std.testing.allocator);
     defer h.deinit();
     _ = try h.appendSlice(&.{ 1, 11, 111, 333, 3333, 2222, 1111 });
 
@@ -834,7 +834,7 @@ test "in-place methods" {
 
 test "sizeOf" {
     const unmanagedSize = @sizeOf(SetUnmanaged(u32));
-    const managedSize = @sizeOf(SetManaged(u32));
+    const managedSize = @sizeOf(HashSetManaged(u32));
 
     // The managed must be only 16 bytes larger, the cost of the internal allocator
     // otherwise we've added some CRAP!
