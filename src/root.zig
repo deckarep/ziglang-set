@@ -19,11 +19,16 @@
 ///
 ///
 
-/// SetUnmanaged is a conveniently exported "unmanaged" version of the Set.
-const SetUnmanaged = @import("hashset/unmanaged.zig").SetUnmanaged;
-/// SetManaged is a conveniently exported "managed" version of the Set.
-const HashSetManaged = @import("hashset/managed.zig").HashSetManaged;
-
 /// Set is just a short convenient "default" alias. If you don't know
-/// which to pick, just use this one.
+/// which to pick, just use Set.
 const Set = HashSetManaged;
+
+/// HashSetUnmanaged is a conveniently exported "unmanaged" version of a hash-based Set.
+const HashSetUnmanaged = @import("hash_set/unmanaged.zig").HashSetUnmanaged;
+/// HashSetManaged is a conveniently exported "managed" version of a hash_based Set.
+const HashSetManaged = @import("hash_set/managed.zig").HashSetManaged;
+
+/// ArraySetUnmanaged is a conveniently exported "unmanaged" version of an array-based Set.
+/// This is a bit more specialized and optimized for heavy iteration.
+const ArraySetUnmanaged = @import("array_hash_set/unmanaged.zig").ArraySetUnmanaged;
+
