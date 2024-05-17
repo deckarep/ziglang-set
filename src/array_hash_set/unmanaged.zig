@@ -175,6 +175,10 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
             return false;
         }
 
+        pub fn ensureTotalCapacity(self: *Self, allocator: Allocator, num: Size) Allocator.Error!void {
+            return self.unmanaged.ensureTotalCapacity(allocator, num);
+        }
+
         /// differenceOf returns the difference between this set
         /// and other. The returned set will contain
         /// all elements of this set that are not also
