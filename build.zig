@@ -8,6 +8,8 @@ pub fn build(b: *std.Build) void {
 
     _ = b.addModule("ziglangSet", .{
         .root_source_file = .{ .path = "src/root.zig" },
+        .target = target,
+        .optimize = optimize,
     });
 
     const main_tests = b.addTest(.{
