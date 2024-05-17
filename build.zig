@@ -7,12 +7,12 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
 
     _ = b.addModule("ziglangSet", .{
-        .root_source_file = .{ .path = "src/set.zig" },
+        .root_source_file = .{ .path = "src/root.zig" },
     });
 
     const main_tests = b.addTest(.{
         .name = "ziglang-set tests",
-        .root_source_file = .{ .path = "src/set.zig" },
+        .root_source_file = .{ .path = "src/root.zig" },
         .target = target,
         .optimize = optimize,
     });
@@ -24,7 +24,7 @@ pub fn build(b: *std.Build) void {
     // Below is for docs generation.
     const lib = b.addObject(.{
         .name = "ziglang-set",
-        .root_source_file = b.path("src/set.zig"),
+        .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });

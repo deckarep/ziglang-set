@@ -36,8 +36,12 @@ This implementation gives credit and acknowledgement to the [Zig language](https
 #### Features
   * Offers idiomatic, generic-based Zig API - allocators, iterators, capacity hints, clearing, resizing, etc.
   * A few flavors to choose from
-    * SetManaged - initializes with an allocator and holds it internally (built on top of unmanaged)
-    * SetUnmanaged - does not hold an allocator, optimized when storing many Sets
+    * Hash-based: everyday usecase, optimized for lookups primarily, insertion/removal secondarily - [further reading](https://devlog.hexops.com/2022/zig-hashmaps-explained/)
+      * HashSetManaged - initializes with an allocator and holds it internally (built on top of unmanaged)
+      * HashSetUnmanaged - does not hold an allocator, smaller footprint
+    * Array-based: more specialized, iteration much faster, insertion order preserved, indexing into underylying data - [further reading](https://devlog.hexops.com/2022/zig-hashmaps-explained/)
+      * ArrayHashSetManaged - initializes with an allocator and holds it internally (built on top of unmanaged)
+      * ArrayHashSetUnmanaged - does not hold an allocator, smaller footprint
   * Common set operations
     * add, append, appendSlice
     * remove, removeAll
