@@ -23,6 +23,7 @@ const std = @import("std");
 const mem = std.mem;
 const Allocator = mem.Allocator;
 const SetUnmanaged = @import("unmanaged.zig").HashSetUnmanaged;
+const SetUnmanagedWithContext = @import("unmanaged.zig").HashSetUnmanagedWithContext;
 
 /// fn HashSetManaged(E) creates a set based on element type E.
 /// This implementation is backed by the std.AutoHashMap implementation
@@ -30,16 +31,29 @@ const SetUnmanaged = @import("unmanaged.zig").HashSetUnmanaged;
 /// a Key is considered to be a Set element of type E.
 /// The Set comes complete with the common set operations expected
 /// in a comprehensive set-based data-structure.
+/// Calls to HashSetManaged default to a max_load_percentage of 100%.
 pub fn HashSetManaged(comptime E: type) type {
+    return HashSetManagedWithContext(E, void, 100);
+}
+
+/// HashSetManagedWithContext creates a set based on element type E with custom hashing behavior.
+/// This variant allows specifying:
+/// - A Context type that implements hash() and eql() functions for custom element hashing
+/// - A max_load_percentage (1-100) that controls hash table resizing
+///
+/// The Context type must provide:
+///   fn hash(self: Context, key: K) u64
+///   fn eql(self: Context, a: K, b: K) bool
+pub fn HashSetManagedWithContext(comptime E: type, comptime Context: type, comptime max_load_percentage: u8) type {
     return struct {
         allocator: std.mem.Allocator,
 
         map: Map,
+        context: if (Context == void) void else Context = if (Context == void) {} else undefined,
+        max_load_percentage: if (Context == void) void else u8 = if (Context == void) {} else max_load_percentage,
 
         /// The type of the internal hash map
-        pub const Map = SetUnmanaged(E); //selectMap(E);
-        //pub const Map = std.AutoHashMap(E, void);
-        /// The integer type used to store the size of the map, borrowed from map
+        pub const Map = SetUnmanagedWithContext(E, Context, max_load_percentage);
         pub const Size = Map.Size;
         /// The iterator type returned by iterator(), key-only for sets
         pub const Iterator = Map.Iterator;
@@ -51,6 +65,17 @@ pub fn HashSetManaged(comptime E: type) type {
             return .{
                 .allocator = allocator,
                 .map = Map.init(),
+                .context = if (Context == void) {} else undefined,
+                .max_load_percentage = if (Context == void) {} else max_load_percentage,
+            };
+        }
+
+        pub fn initContext(allocator: std.mem.Allocator, context: Context) Self {
+            return .{
+                .allocator = allocator,
+                .map = Map.initContext(context),
+                .context = context,
+                .max_load_percentage = max_load_percentage,
             };
         }
 
@@ -840,4 +865,25 @@ test "sizeOf" {
     // otherwise we've added some CRAP!
     const expectedDiff = 16;
     try expectEqual(expectedDiff, managedSize - unmanagedSize);
+}
+
+const MyContext = struct {
+    pub fn hash(self: @This(), key: u32) u64 {
+        _ = self;
+        return @as(u64, key) *% 0x517cc1b727220a95;
+    }
+
+    pub fn eql(self: @This(), a: u32, b: u32) bool {
+        _ = self;
+        return a == b;
+    }
+};
+
+test "custom hash function" {
+    const context = MyContext{};
+    var set = HashSetManagedWithContext(u32, MyContext, 75).initContext(testing.allocator, context);
+    defer set.deinit();
+
+    _ = try set.add(123);
+    try expect(set.contains(123));
 }

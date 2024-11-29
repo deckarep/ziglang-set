@@ -20,6 +20,7 @@
 ///
 const std = @import("std");
 const mem = std.mem;
+const math = std.math;
 const Allocator = mem.Allocator;
 
 /// comptime selection of the map type for string vs everything else.
@@ -33,16 +34,28 @@ fn selectMap(comptime E: type) type {
     }
 }
 
+/// Select a context-aware hash map type
+fn selectMapWithContext(comptime E: type, comptime Context: type, comptime max_load_percentage: u8) type {
+    return std.HashMapUnmanaged(E, void, Context, max_load_percentage);
+}
+
 /// HashSetUnmanaged is an implementation of a Set where there is no internal
 /// allocator and all allocating methods require a first argument allocator.
 /// This is a more compact Set built on top of the the HashMapUnmanaged
 /// datastructure.
 pub fn HashSetUnmanaged(comptime E: type) type {
+    return HashSetUnmanagedWithContext(E, void, 100);
+}
+
+/// HashSetUnmanagedWithContext allows for custom hash functions via a context
+pub fn HashSetUnmanagedWithContext(comptime E: type, comptime Context: type, comptime max_load_percentage: u8) type {
     return struct {
         /// The type of the internal hash map
-        pub const Map = selectMap(E);
+        pub const Map = if (Context == void) selectMap(E) else selectMapWithContext(E, Context, max_load_percentage);
 
         unmanaged: Map,
+        context: if (Context == void) void else Context = if (Context == void) {} else undefined,
+        max_load_percentage: if (Context == void) void else u8 = if (Context == void) {} else max_load_percentage,
 
         pub const Size = Map.Size;
         /// The iterator type returned by iterator(), key-only for sets
@@ -50,10 +63,21 @@ pub fn HashSetUnmanaged(comptime E: type) type {
 
         const Self = @This();
 
-        /// Initialzies a Set with the given Allocator
+        /// Initialize a default set without context
         pub fn init() Self {
             return .{
                 .unmanaged = Map{},
+                .context = if (Context == void) {} else undefined,
+                .max_load_percentage = if (Context == void) {} else max_load_percentage,
+            };
+        }
+
+        /// Initialize with a custom context
+        pub fn initContext(context: Context) Self {
+            return .{
+                .unmanaged = Map{},
+                .context = context,
+                .max_load_percentage = max_load_percentage,
             };
         }
 
@@ -767,4 +791,25 @@ test "sizeOf matches" {
     const expectedByteSize = 24;
     try expectEqual(expectedByteSize, @sizeOf(std.hash_map.AutoHashMapUnmanaged(u32, void)));
     try expectEqual(expectedByteSize, @sizeOf(HashSetUnmanaged(u32)));
+}
+
+const MyContext = struct {
+    pub fn hash(self: @This(), key: u32) u64 {
+        _ = self;
+        return @as(u64, key) *% 0x517cc1b727220a95;
+    }
+
+    pub fn eql(self: @This(), a: u32, b: u32) bool {
+        _ = self;
+        return a == b;
+    }
+};
+
+test "custom hash function" {
+    const context = MyContext{};
+    var set = HashSetUnmanagedWithContext(u32, MyContext, 75).initContext(context);
+    defer set.deinit(testing.allocator);
+
+    _ = try set.add(testing.allocator, 123);
+    try expect(set.contains(123));
 }
