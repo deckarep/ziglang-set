@@ -805,11 +805,152 @@ const MyContext = struct {
     }
 };
 
-test "custom hash function" {
+test "custom hash function comprehensive" {
     const context = MyContext{};
     var set = HashSetUnmanagedWithContext(u32, MyContext, 75).initContext(context);
     defer set.deinit(testing.allocator);
 
+    // Test basic operations
     _ = try set.add(testing.allocator, 123);
+    _ = try set.add(testing.allocator, 456);
     try expect(set.contains(123));
+    try expect(set.contains(456));
+    try expect(!set.contains(789));
+    try expectEqual(set.cardinality(), 2);
+
+    // Test clone with custom context
+    var cloned = try set.clone(testing.allocator);
+    defer cloned.deinit(testing.allocator);
+    try expect(cloned.contains(123));
+    try expect(set.eql(cloned));
+
+    // Test set operations with custom context
+    var other = HashSetUnmanagedWithContext(u32, MyContext, 75).initContext(context);
+    defer other.deinit(testing.allocator);
+    _ = try other.add(testing.allocator, 456);
+    _ = try other.add(testing.allocator, 789);
+
+    // Test union
+    var union_set = try set.unionOf(testing.allocator, other);
+    defer union_set.deinit(testing.allocator);
+    try expectEqual(union_set.cardinality(), 3);
+    try expect(union_set.containsAllSlice(&.{ 123, 456, 789 }));
+
+    // Test intersection
+    var intersection = try set.intersectionOf(testing.allocator, other);
+    defer intersection.deinit(testing.allocator);
+    try expectEqual(intersection.cardinality(), 1);
+    try expect(intersection.contains(456));
+
+    // Test difference
+    var difference = try set.differenceOf(testing.allocator, other);
+    defer difference.deinit(testing.allocator);
+    try expectEqual(difference.cardinality(), 1);
+    try expect(difference.contains(123));
+
+    // Test symmetric difference
+    var sym_diff = try set.symmetricDifferenceOf(testing.allocator, other);
+    defer sym_diff.deinit(testing.allocator);
+    try expectEqual(sym_diff.cardinality(), 2);
+    try expect(sym_diff.containsAllSlice(&.{ 123, 789 }));
+
+    // Test in-place operations
+    try set.unionUpdate(testing.allocator, other);
+    try expectEqual(set.cardinality(), 3);
+    try expect(set.containsAllSlice(&.{ 123, 456, 789 }));
+}
+
+test "custom hash function with different load factors" {
+    const context = MyContext{};
+
+    // Test with low load factor
+    var low_load = HashSetUnmanagedWithContext(u32, MyContext, 25).initContext(context);
+    defer low_load.deinit(testing.allocator);
+
+    // Test with high load factor
+    var high_load = HashSetUnmanagedWithContext(u32, MyContext, 90).initContext(context);
+    defer high_load.deinit(testing.allocator);
+
+    // Add same elements to both
+    for (0..100) |i| {
+        _ = try low_load.add(testing.allocator, @intCast(i));
+        _ = try high_load.add(testing.allocator, @intCast(i));
+    }
+
+    // Verify functionality is identical despite different load factors
+    try expectEqual(low_load.cardinality(), high_load.cardinality());
+    try expect(low_load.capacity() != high_load.capacity()); // Should be different due to load factors
+
+    // Verify both sets contain the same elements
+    for (0..100) |i| {
+        const val: u32 = @intCast(i);
+        try expect(low_load.contains(val) and high_load.contains(val));
+    }
+}
+
+test "custom hash function error cases" {
+    const context = MyContext{};
+    var set = HashSetUnmanagedWithContext(u32, MyContext, 75).initContext(context);
+    defer set.deinit(testing.allocator);
+
+    // Test allocation failures
+    var failing_allocator = std.testing.FailingAllocator.init(testing.allocator, .{ .fail_index = 0 });
+    try std.testing.expectError(error.OutOfMemory, set.add(failing_allocator.allocator(), 123));
+}
+
+// String context for testing string usage with custom hash function
+const StringContext = struct {
+    pub fn hash(self: @This(), str: []const u8) u64 {
+        _ = self;
+        // Simple FNV-1a hash
+        var h: u64 = 0xcbf29ce484222325;
+        for (str) |b| {
+            h = (h ^ b) *% 0x100000001b3;
+        }
+        return h;
+    }
+
+    pub fn eql(self: @This(), a: []const u8, b: []const u8) bool {
+        _ = self;
+        return std.mem.eql(u8, a, b);
+    }
+};
+
+test "custom hash function string usage" {
+    const context = StringContext{};
+    var A = HashSetUnmanagedWithContext([]const u8, StringContext, 75).initContext(context);
+    defer A.deinit(testing.allocator);
+
+    var B = HashSetUnmanagedWithContext([]const u8, StringContext, 75).initContext(context);
+    defer B.deinit(testing.allocator);
+
+    _ = try A.add(testing.allocator, "Hello");
+    _ = try B.add(testing.allocator, "World");
+
+    var C = try A.unionOf(testing.allocator, B);
+    defer C.deinit(testing.allocator);
+    try expectEqual(2, C.cardinality());
+    try expect(C.containsAllSlice(&.{ "Hello", "World" }));
+
+    // Test string-specific behavior
+    try expect(A.contains("Hello"));
+    try expect(!A.contains("hello")); // Case sensitive
+    try expect(!A.contains("Hell")); // Prefix doesn't match
+    try expect(!A.contains("Hello ")); // Trailing space matters
+
+    // Test with longer strings
+    _ = try A.add(testing.allocator, "This is a longer string to test hash collisions");
+    _ = try A.add(testing.allocator, "This is another longer string to test hash collisions");
+    try expectEqual(3, A.cardinality());
+
+    // Test with empty string
+    _ = try A.add(testing.allocator, "");
+    try expect(A.contains(""));
+    try expectEqual(4, A.cardinality());
+
+    // Test with strings containing special characters
+    _ = try A.add(testing.allocator, "Hello\n");
+    _ = try A.add(testing.allocator, "Hello\r");
+    _ = try A.add(testing.allocator, "Hello\t");
+    try expectEqual(7, A.cardinality());
 }
