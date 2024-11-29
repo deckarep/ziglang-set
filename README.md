@@ -59,6 +59,7 @@ This implementation gives credit and acknowledgement to the [Zig language](https
     * pop
   * Fully documented and robustly tested - in progress
   * Performance aware to minimize unecessary allocs/iteration internally
+  * Custom hash function support
   * "string" support - coming soon
   * Benchmarks - coming soon
 #
@@ -112,6 +113,24 @@ Output of `A | B` - the union of A and B (order is not guaranteed)
 > element: 50
 > element: 30
 > element: 20
+```
+
+#
+
+#### Custom Hash Function
+
+To use a custom hash function, you can use the following types:
+
+- `HashSetUnmanagedWithContext`
+- `HashSetManagedWithContext`
+
+Example:
+
+```zig
+    const context = MyContext{};
+    const max_load_percent = 75;
+    var set = HashSetUnmanagedWithContext(u32, MyContext, max_load_percent).initContext(context);
+    defer set.deinit(testing.allocator);
 ```
 
 #
