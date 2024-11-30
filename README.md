@@ -137,7 +137,8 @@ Example:
         }
     };
 
-    var set = HashSetUnmanagedWithContext(u32, SimpleHasher, 75).initContext(.{});
+    const ctx = SimpleHasher{};
+    var set = HashSetUnmanagedWithContext(u32, SimpleHasher, 75).initContext(ctx);
     defer set.deinit(testing.allocator);
 
     _ = try set.add(testing.allocator, 123);
