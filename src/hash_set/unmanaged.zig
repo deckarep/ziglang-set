@@ -799,8 +799,19 @@ test "sizeOf matches" {
     // No bloat guarantee, after all we're just building on top of what's good.
     // "What's good Miley!?!?""
     const expectedByteSize = 24;
-    try expectEqual(expectedByteSize, @sizeOf(std.hash_map.AutoHashMapUnmanaged(u32, void)));
-    try expectEqual(expectedByteSize, @sizeOf(HashSetUnmanaged(u32)));
+    const autoHashMapSize = @sizeOf(std.hash_map.AutoHashMapUnmanaged(u32, void));
+    const hashSetSize = @sizeOf(HashSetUnmanaged(u32));
+    try expectEqual(expectedByteSize, autoHashMapSize);
+    try expectEqual(expectedByteSize, hashSetSize);
+
+    // The unmanaged with void context must be the same size as the unmanaged.
+    // The unmanaged with context must be larger by the size of the empty Context struct,
+    // due to the added Context and alignment padding.
+    const expectedContextDiff = 8;
+    const hashSetWithVoidContextSize = @sizeOf(HashSetUnmanagedWithContext(u32, void, undefined));
+    const hashSetWithContextSize = @sizeOf(HashSetUnmanagedWithContext(u32, TestContext, 75));
+    try expectEqual(0, hashSetWithVoidContextSize - hashSetSize);
+    try expectEqual(expectedContextDiff, hashSetWithContextSize - hashSetSize);
 }
 
 const TestContext = struct {

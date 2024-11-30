@@ -862,11 +862,20 @@ test "in-place methods" {
 test "sizeOf" {
     const unmanagedSize = @sizeOf(SetUnmanaged(u32));
     const managedSize = @sizeOf(HashSetManaged(u32));
+    const managedWithVoidContextSize = @sizeOf(HashSetManagedWithContext(u32, void, undefined));
+    const managedWithContextSize = @sizeOf(HashSetManagedWithContext(u32, TestContext, 75));
 
     // The managed must be only 16 bytes larger, the cost of the internal allocator
     // otherwise we've added some CRAP!
     const expectedDiff = 16;
     try expectEqual(expectedDiff, managedSize - unmanagedSize);
+
+    // The managed with void context must be the same size as the managed.
+    // The managed with context must be larger by the size of the Context type,
+    // due to the added Context + allocator and alignment padding.
+    const expectedContextDiff = 16;
+    try expectEqual(expectedDiff, managedWithVoidContextSize - unmanagedSize);
+    try expectEqual(expectedContextDiff, managedWithContextSize - managedSize);
 }
 
 const TestContext = struct {
