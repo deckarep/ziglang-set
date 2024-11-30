@@ -31,15 +31,17 @@ const SetUnmanagedWithContext = @import("unmanaged.zig").HashSetUnmanagedWithCon
 /// a Key is considered to be a Set element of type E.
 /// The Set comes complete with the common set operations expected
 /// in a comprehensive set-based data-structure.
-/// Calls to HashSetManaged default to a max_load_percentage of 100%.
+/// Note that max_load_percentage is passed as undefined, because the underlying
+/// std.AutoHashMap/std.StringHashMap defaults are used.
 pub fn HashSetManaged(comptime E: type) type {
-    return HashSetManagedWithContext(E, void, 100);
+    return HashSetManagedWithContext(E, void, undefined);
 }
 
 /// HashSetManagedWithContext creates a set based on element type E with custom hashing behavior.
 /// This variant allows specifying:
 /// - A Context type that implements hash() and eql() functions for custom element hashing
 /// - A max_load_percentage (1-100) that controls hash table resizing
+/// If Context is undefined, then max_load_percentage is ignored.
 ///
 /// The Context type must provide:
 ///   fn hash(self: Context, key: K) u64

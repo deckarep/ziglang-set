@@ -43,11 +43,21 @@ fn selectMapWithContext(comptime E: type, comptime Context: type, comptime max_l
 /// allocator and all allocating methods require a first argument allocator.
 /// This is a more compact Set built on top of the the HashMapUnmanaged
 /// datastructure.
+/// Note that max_load_percentage defaults to undefined, because the underlying
+/// std.AutoHashMap/std.StringHashMap defaults are used.
 pub fn HashSetUnmanaged(comptime E: type) type {
-    return HashSetUnmanagedWithContext(E, void, 100);
+    return HashSetUnmanagedWithContext(E, void, undefined);
 }
 
-/// HashSetUnmanagedWithContext allows for custom hash functions via a context
+/// HashSetUnmanagedWithContext creates a set based on element type E with custom hashing behavior.
+/// This variant allows specifying:
+/// - A Context type that implements hash() and eql() functions for custom element hashing
+/// - A max_load_percentage (1-100) that controls hash table resizing
+/// If Context is undefined, then max_load_percentage is ignored.
+///
+/// The Context type must provide:
+///   fn hash(self: Context, key: K) u64
+///   fn eql(self: Context, a: K, b: K) bool
 pub fn HashSetUnmanagedWithContext(comptime E: type, comptime Context: type, comptime max_load_percentage: u8) type {
     return struct {
         /// The type of the internal hash map
