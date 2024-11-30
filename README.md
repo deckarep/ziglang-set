@@ -127,10 +127,22 @@ To use a custom hash function, you can use the following types:
 Example:
 
 ```zig
-    const context = MyContext{};
-    const max_load_percent = 75;
-    var set = HashSetUnmanagedWithContext(u32, MyContext, max_load_percent).initContext(context);
+    const SimpleHasher = struct {
+        const Self = @This();
+        pub fn hash(_: Self, key: u32) u64 {
+            return @as(u64, key) *% 0x517cc1b727220a95;
+        }
+        pub fn eql(_: Self, a: u32, b: u32) bool {
+            return a == b;
+        }
+    };
+
+    var set = HashSetUnmanagedWithContext(u32, SimpleHasher, 75).initContext(.{});
     defer set.deinit(testing.allocator);
+
+    _ = try set.add(testing.allocator, 123);
+    try expect(set.contains(123));
+    try expect(!set.contains(456));
 ```
 
 #
