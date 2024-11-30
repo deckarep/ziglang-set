@@ -867,21 +867,19 @@ test "sizeOf" {
     try expectEqual(expectedDiff, managedSize - unmanagedSize);
 }
 
-const MyContext = struct {
-    pub fn hash(self: @This(), key: u32) u64 {
-        _ = self;
+const TestContext = struct {
+    const Self = @This();
+    pub fn hash(_: Self, key: u32) u64 {
         return @as(u64, key) *% 0x517cc1b727220a95;
     }
-
-    pub fn eql(self: @This(), a: u32, b: u32) bool {
-        _ = self;
+    pub fn eql(_: Self, a: u32, b: u32) bool {
         return a == b;
     }
 };
 
 test "custom hash function" {
-    const context = MyContext{};
-    var set = HashSetManagedWithContext(u32, MyContext, 75).initContext(testing.allocator, context);
+    const context = TestContext{};
+    var set = HashSetManagedWithContext(u32, TestContext, 75).initContext(testing.allocator, context);
     defer set.deinit();
 
     _ = try set.add(123);

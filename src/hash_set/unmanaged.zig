@@ -793,21 +793,19 @@ test "sizeOf matches" {
     try expectEqual(expectedByteSize, @sizeOf(HashSetUnmanaged(u32)));
 }
 
-const MyContext = struct {
-    pub fn hash(self: @This(), key: u32) u64 {
-        _ = self;
+const TestContext = struct {
+    const Self = @This();
+    pub fn hash(_: Self, key: u32) u64 {
         return @as(u64, key) *% 0x517cc1b727220a95;
     }
-
-    pub fn eql(self: @This(), a: u32, b: u32) bool {
-        _ = self;
+    pub fn eql(_: Self, a: u32, b: u32) bool {
         return a == b;
     }
 };
 
 test "custom hash function comprehensive" {
-    const context = MyContext{};
-    var set = HashSetUnmanagedWithContext(u32, MyContext, 75).initContext(context);
+    const context = TestContext{};
+    var set = HashSetUnmanagedWithContext(u32, TestContext, 75).initContext(context);
     defer set.deinit(testing.allocator);
 
     // Test basic operations
@@ -825,7 +823,7 @@ test "custom hash function comprehensive" {
     try expect(set.eql(cloned));
 
     // Test set operations with custom context
-    var other = HashSetUnmanagedWithContext(u32, MyContext, 75).initContext(context);
+    var other = HashSetUnmanagedWithContext(u32, TestContext, 75).initContext(context);
     defer other.deinit(testing.allocator);
     _ = try other.add(testing.allocator, 456);
     _ = try other.add(testing.allocator, 789);
@@ -861,14 +859,14 @@ test "custom hash function comprehensive" {
 }
 
 test "custom hash function with different load factors" {
-    const context = MyContext{};
+    const context = TestContext{};
 
     // Test with low load factor
-    var low_load = HashSetUnmanagedWithContext(u32, MyContext, 25).initContext(context);
+    var low_load = HashSetUnmanagedWithContext(u32, TestContext, 25).initContext(context);
     defer low_load.deinit(testing.allocator);
 
     // Test with high load factor
-    var high_load = HashSetUnmanagedWithContext(u32, MyContext, 90).initContext(context);
+    var high_load = HashSetUnmanagedWithContext(u32, TestContext, 90).initContext(context);
     defer high_load.deinit(testing.allocator);
 
     // Add same elements to both
@@ -889,8 +887,8 @@ test "custom hash function with different load factors" {
 }
 
 test "custom hash function error cases" {
-    const context = MyContext{};
-    var set = HashSetUnmanagedWithContext(u32, MyContext, 75).initContext(context);
+    const context = TestContext{};
+    var set = HashSetUnmanagedWithContext(u32, TestContext, 75).initContext(context);
     defer set.deinit(testing.allocator);
 
     // Test allocation failures
