@@ -146,7 +146,7 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
         pub fn containsAll(self: Self, other: Self) bool {
             var iter = other.iterator();
             while (iter.next()) |el| {
-                if (!self.unmanaged.contains(el.*)) {
+                if (!self.unmanaged.contains(el.key_ptr.*)) {
                     return false;
                 }
             }

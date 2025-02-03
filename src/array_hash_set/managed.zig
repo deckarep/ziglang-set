@@ -72,9 +72,7 @@ pub fn ArraySetManaged(comptime E: type) type {
         /// A bool is returned indicating if the element was actually added
         /// if not already known.
         pub fn addAssumeCapacity(self: *Self, element: E) bool {
-            const prevCount = self.unmanaged.cardinality();
-            self.unmanaged.putAssumeCapacity(self.allocator, element, {});
-            return prevCount != self.unmanaged.cardinality();
+            return self.unmanaged.add(self.allocator, element) catch unreachable;
         }
 
         /// Appends all elements from the provided set, and may allocate.
@@ -82,8 +80,12 @@ pub fn ArraySetManaged(comptime E: type) type {
         /// many elements added and not previously in the Set.
         pub fn append(self: *Self, other: Self) Allocator.Error!Size {
             const prevCount = self.unmanaged.cardinality();
-
-            try self.unionUpdate(self.allocator, other);
+            // Directly access the underlying map instead of using unionUpdate
+            // We avoid double existence/capacity checks by accessing map directly
+            var iter = other.unmanaged.iterator();
+            while (iter.next()) |entry| {
+                _ = try self.unmanaged.put(self.allocator, entry.key_ptr.*, {});
+            }
             return self.unmanaged.cardinality() - prevCount;
         }
 
@@ -133,16 +135,12 @@ pub fn ArraySetManaged(comptime E: type) type {
         /// Creates a copy of this set, using a specified allocator.
         /// cloneWithAllocator may be return an Allocator.Error or the cloned Set.
         pub fn cloneWithAllocator(self: *Self, allocator: Allocator) Allocator.Error!Self {
-            // Since we're borrowing the internal map allocator, temporarily back it up.
-            const prevAllocator = self.allocator;
-            // Restore it at the end of the func, because the self.unmanaged should use the
-            // original allocator.
-            defer self.allocator = prevAllocator;
-
-            // The cloned map must use and refer to the new allocator only.
-            self.allocator = allocator;
-            const cloneSelf = try self.clone();
-            return cloneSelf;
+            // Directly clone the unmanaged structure with the new allocator
+            const clonedUnmanaged = try self.unmanaged.cloneWithAllocator(allocator);
+            return Self{
+                .allocator = allocator,
+                .unmanaged = clonedUnmanaged,
+            };
         }
 
         /// Returns true when the provided element exists within the Set otherwise false.
@@ -153,7 +151,7 @@ pub fn ArraySetManaged(comptime E: type) type {
         /// Returns true when all elements in the other Set are present in this Set
         /// otherwise false.
         pub fn containsAll(self: Self, other: Self) bool {
-            return self.unmanaged.containsAll(other);
+            return self.unmanaged.containsAll(other.unmanaged);
         }
 
         /// Returns true when all elements in the provided slice are present otherwise false.
@@ -164,13 +162,8 @@ pub fn ArraySetManaged(comptime E: type) type {
         /// Returns true when at least one or more elements from the other Set exist within
         /// this Set otherwise false.
         pub fn containsAny(self: Self, other: Self) bool {
-            var iter = other.iterator();
-            while (iter.next()) |el| {
-                if (self.unmanaged.contains(el.*)) {
-                    return true;
-                }
-            }
-            return false;
+            // Delegate to the unmanaged implementation which might have optimizations
+            return self.unmanaged.containsAny(other.unmanaged);
         }
 
         /// Returns true when at least one or more elements from the slice exist within
@@ -191,15 +184,12 @@ pub fn ArraySetManaged(comptime E: type) type {
         ///
         /// Caller owns the newly allocated/returned set.
         pub fn differenceOf(self: Self, other: Self) Allocator.Error!Self {
-            var diffSet = Self.init(self.allocator);
-
-            var iter = self.unmanaged.iterator();
-            while (iter.next()) |pVal| {
-                if (!other.unmanaged.contains(pVal.key_ptr.*)) {
-                    _ = try diffSet.add(pVal.key_ptr.*);
-                }
-            }
-            return diffSet;
+            // Delegate to unmanaged implementation to avoid double iteration
+            const diffUnmanaged = try self.unmanaged.differenceOf(self.allocator, other.unmanaged);
+            return Self{
+                .allocator = self.allocator,
+                .unmanaged = diffUnmanaged,
+            };
         }
 
         /// differenceUpdate does an in-place mutation of this set
@@ -272,25 +262,11 @@ pub fn ArraySetManaged(comptime E: type) type {
         ///
         /// Caller owns the newly allocated/returned set.
         pub fn intersectionOf(self: Self, other: Self) Allocator.Error!Self {
-            var interSet = Self.init(self.allocator);
-
-            // Optimization: iterate over whichever set is smaller.
-            // Matters when disparity in cardinality is large.
-            var s = other;
-            var o = self;
-            if (self.unmanaged.cardinality() < other.unmanaged.cardinality()) {
-                s = self;
-                o = other;
-            }
-
-            var iter = s.unmanaged.iterator();
-            while (iter.next()) |pVal| {
-                if (o.unmanaged.contains(pVal.key_ptr.*)) {
-                    _ = try interSet.add(pVal.key_ptr.*);
-                }
-            }
-
-            return interSet;
+            const interUnmanaged = try self.unmanaged.intersectionOf(self.allocator, other.unmanaged);
+            return Self{
+                .allocator = self.allocator,
+                .unmanaged = interUnmanaged,
+            };
         }
 
         /// intersectionUpdate does an in-place intersecting update
@@ -412,23 +388,12 @@ pub fn ArraySetManaged(comptime E: type) type {
         ///
         /// The caller owns the newly allocated/returned Set.
         pub fn symmetricDifferenceOf(self: Self, other: Self) Allocator.Error!Self {
-            var sdSet = Self.init(self.allocator);
-
-            var iter = self.unmanaged.iterator();
-            while (iter.next()) |pVal| {
-                if (!other.unmanaged.contains(pVal.key_ptr.*)) {
-                    _ = try sdSet.add(pVal.key_ptr.*);
-                }
-            }
-
-            iter = other.unmanaged.iterator();
-            while (iter.next()) |pVal| {
-                if (!self.unmanaged.contains(pVal.key_ptr.*)) {
-                    _ = try sdSet.add(pVal.key_ptr.*);
-                }
-            }
-
-            return sdSet;
+            // Use optimized unmanaged implementation
+            const sdUnmanaged = try self.unmanaged.symmetricDifferenceOf(self.allocator, other.unmanaged);
+            return Self{
+                .allocator = self.allocator,
+                .unmanaged = sdUnmanaged,
+            };
         }
 
         /// symmetricDifferenceUpdate does an in-place mutation with all elements
@@ -455,26 +420,11 @@ pub fn ArraySetManaged(comptime E: type) type {
         ///
         /// The caller owns the newly allocated/returned Set.
         pub fn unionOf(self: Self, other: Self) Allocator.Error!Self {
-            // Sniff out larger set for capacity hint.
-            var n = self.unmanaged.cardinality();
-            if (other.unmanaged.cardinality() > n) n = other.unmanaged.cardinality();
-
-            var uSet = try Self.initCapacity(
-                self.allocator,
-                @intCast(n),
-            );
-
-            var iter = self.unmanaged.iterator();
-            while (iter.next()) |pVal| {
-                _ = try uSet.add(pVal.key_ptr.*);
-            }
-
-            iter = other.unmanaged.iterator();
-            while (iter.next()) |pVal| {
-                _ = try uSet.add(pVal.key_ptr.*);
-            }
-
-            return uSet;
+            const unionUnmanaged = try self.unmanaged.unionOf(self.allocator, other.unmanaged);
+            return Self{
+                .allocator = self.allocator,
+                .unmanaged = unionUnmanaged,
+            };
         }
 
         /// unionUpdate does an in-place union of the current Set and other Set.
@@ -833,4 +783,54 @@ test "sizeOf" {
     // otherwise we've added some CRAP!
     const expectedDiff = 16;
     try expectEqual(expectedDiff, managedSize - unmanagedSize);
+}
+
+test "benchmark" {
+    const allocator = std.testing.allocator;
+    const Iterations = 10_000;
+    const SetSize = 1000;
+
+    // Setup
+    var base = try ArraySetManaged(u32).initCapacity(allocator, SetSize);
+    defer base.deinit();
+    for (0..SetSize) |i| _ = base.addAssumeCapacity(@intCast(i));
+
+    var other = try ArraySetManaged(u32).initCapacity(allocator, SetSize);
+    defer other.deinit();
+    for (0..SetSize) |i| _ = other.addAssumeCapacity(@intCast(i + SetSize / 2));
+
+    // Benchmark unionOf
+    var union_timer = try std.time.Timer.start();
+    for (0..Iterations) |_| {
+        var result = try base.unionOf(other);
+        defer result.deinit();
+    }
+    const union_elapsed = union_timer.read();
+    std.debug.print("\nunionOf: {d} ops/sec ({d:.2} ns/op)\n", .{
+        Iterations * std.time.ns_per_s / union_elapsed,
+        @as(f64, @floatFromInt(union_elapsed)) / @as(f64, @floatFromInt(Iterations)),
+    });
+
+    // Benchmark intersectionOf
+    var inter_timer = try std.time.Timer.start();
+    for (0..Iterations) |_| {
+        var result = try base.intersectionOf(other);
+        defer result.deinit();
+    }
+    const inter_elapsed = inter_timer.read();
+    std.debug.print("intersectionOf: {d} ops/sec ({d:.2} ns/op)\n", .{
+        Iterations * std.time.ns_per_s / inter_elapsed,
+        @as(f64, @floatFromInt(inter_elapsed)) / @as(f64, @floatFromInt(Iterations)),
+    });
+
+    // Benchmark containsAll
+    var contains_timer = try std.time.Timer.start();
+    for (0..Iterations) |_| {
+        _ = base.containsAll(other);
+    }
+    const contains_elapsed = contains_timer.read();
+    std.debug.print("containsAll: {d} ops/sec ({d:.2} ns/op)\n", .{
+        Iterations * std.time.ns_per_s / contains_elapsed,
+        @as(f64, @floatFromInt(contains_elapsed)) / @as(f64, @floatFromInt(Iterations)),
+    });
 }
