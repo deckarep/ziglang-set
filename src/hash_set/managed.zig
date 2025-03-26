@@ -134,8 +134,7 @@ pub fn HashSetManagedWithContext(comptime E: type, comptime Context: type, compt
 
         /// Returns the number of total elements which may be present before
         /// it is no longer guaranteed that no allocations will be performed.
-        pub fn capacity(self: *Self) Size {
-            // Note: map.capacity() requires mutable access, probably an oversight.
+        pub fn capacity(self: Self) Size {
             return self.map.capacity();
         }
 
