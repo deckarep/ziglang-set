@@ -219,8 +219,8 @@ zig build test
 
 ```sh
 # With Zig installed:
-zig build-lib -femit-docs src/root.zig
+zigup build docs && cp -a zig-out/docs/. docs/
 
 # Alternatively, using Zigup:
-zigup run {zig-version} build-lib -femit-docs src/root.zig
+zigup run <zig-version> build docs && cp -a zig-out/docs/. docs/
 ```
