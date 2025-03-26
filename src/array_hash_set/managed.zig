@@ -136,7 +136,7 @@ pub fn ArraySetManaged(comptime E: type) type {
         /// cloneWithAllocator may be return an Allocator.Error or the cloned Set.
         pub fn cloneWithAllocator(self: *Self, allocator: Allocator) Allocator.Error!Self {
             // Directly clone the unmanaged structure with the new allocator
-            const clonedUnmanaged = try self.unmanaged.cloneWithAllocator(allocator);
+            const clonedUnmanaged = try self.unmanaged.clone(allocator);
             return Self{
                 .allocator = allocator,
                 .unmanaged = clonedUnmanaged,

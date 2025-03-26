@@ -35,3 +35,10 @@ pub const ArraySetUnmanaged = @import("array_hash_set/unmanaged.zig").ArraySetUn
 
 /// ArraySetManaged is a conveniently exported "managed" version of an array-based Set.
 pub const ArraySetManaged = @import("array_hash_set/managed.zig").ArraySetManaged;
+
+test "tests" {
+    _ = @import("hash_set/unmanaged.zig");
+    _ = @import("hash_set/managed.zig");
+    _ = @import("array_hash_set/unmanaged.zig");
+    _ = @import("array_hash_set/managed.zig");
+}
