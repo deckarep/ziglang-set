@@ -1,7 +1,8 @@
 .{
-    .name = "ziglangSet",
+    .name = .ziglangSet,
     .version = "0.0.1",
-    .minimum_zig_version = "0.12.0",
+    .fingerprint = 0x65aa5acd2ef4855,
+    .minimum_zig_version = "0.14.0",
 
     .dependencies = .{},
 
