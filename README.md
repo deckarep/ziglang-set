@@ -53,6 +53,7 @@ This implementation gives credit and acknowledgement to the [Zig language](https
     * union, unionUpdate (in-place variant)
     * difference, differenceUpdate (in-place variant)
     * symmetricDifference, symmetricDifferenceUpdate (in-place variant)
+    * isDisjoint
     * isSubset
     * isSuperset
     * isProperSubset

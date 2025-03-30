@@ -347,6 +347,12 @@ pub fn HashSetManagedWithContext(comptime E: type, comptime Context: type, compt
             self.map = interSet.map;
         }
 
+        /// isDisjoint returns true if the intersection between two sets is the null set.
+        /// Otherwise returns false.
+        pub fn isDisjoint(self: Self, other: Self) bool {
+            return self.map.isDisjoint(other.map);
+        }
+
         /// In place style:
         /// differenceOfUpdate
         /// symmetric_differenceOf_update
@@ -657,6 +663,28 @@ test "comprehensive usage" {
     // subsetOf
 
     // supersetOf
+}
+
+test "isDisjoint" {
+    var a = HashSetManaged(u32).init(std.testing.allocator);
+    defer a.deinit();
+    _ = try a.appendSlice(&.{ 20, 30, 40 });
+
+    var b = HashSetManaged(u32).init(std.testing.allocator);
+    defer b.deinit();
+    _ = try b.appendSlice(&.{ 202, 303, 403 });
+
+    // Test the true case.
+    try expect(a.isDisjoint(b));
+    try expect(b.isDisjoint(a));
+
+    // Test the false case.
+    var c = HashSetManaged(u32).init(std.testing.allocator);
+    defer c.deinit();
+    _ = try c.appendSlice(&.{ 20, 30, 400 });
+
+    try expect(!a.isDisjoint(c));
+    try expect(!c.isDisjoint(a));
 }
 
 test "clear/capacity" {

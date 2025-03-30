@@ -351,6 +351,22 @@ pub fn HashSetUnmanagedWithContext(comptime E: type, comptime Context: type, com
             self.unmanaged = interSet.unmanaged;
         }
 
+        /// isDisjoint returns true if the intersection between two sets is the null set.
+        /// Otherwise returns false.
+        pub fn isDisjoint(self: Self, other: Self) bool {
+            // Optimization: Find the smaller of the two, and iterate over the smaller set
+            const smaller = if (self.cardinality() <= other.cardinality()) self else other;
+            const larger = if (self.cardinality() <= other.cardinality()) other else self;
+
+            var iter = smaller.iterator();
+            while (iter.next()) |el| {
+                if (larger.contains(el.*)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         pub fn isEmpty(self: Self) bool {
             return self.unmanaged.count() == 0;
         }
@@ -656,6 +672,28 @@ test "comprehensive usage" {
     // subsetOf
 
     // supersetOf
+}
+
+test "isDisjoint" {
+    var a = HashSetUnmanaged(u32).init();
+    defer a.deinit(testing.allocator);
+    _ = try a.appendSlice(testing.allocator, &.{ 20, 30, 40 });
+
+    var b = HashSetUnmanaged(u32).init();
+    defer b.deinit(testing.allocator);
+    _ = try b.appendSlice(testing.allocator, &.{ 202, 303, 403 });
+
+    // Test the true case.
+    try expect(a.isDisjoint(b));
+    try expect(b.isDisjoint(a));
+
+    // Test the false case.
+    var c = HashSetUnmanaged(u32).init();
+    defer c.deinit(testing.allocator);
+    _ = try c.appendSlice(testing.allocator, &.{ 20, 30, 400 });
+
+    try expect(!a.isDisjoint(c));
+    try expect(!c.isDisjoint(a));
 }
 
 test "clone" {
