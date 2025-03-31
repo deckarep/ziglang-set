@@ -289,6 +289,12 @@ pub fn ArraySetManaged(comptime E: type) type {
             self.unmanaged = interSet.unmanaged;
         }
 
+        /// isDisjoint returns true if the intersection between two sets is the null set.
+        /// Otherwise returns false.
+        pub fn isDisjoint(self: Self, other: Self) bool {
+            return self.unmanaged.isDisjoint(other.unmanaged);
+        }
+
         /// In place style:
         /// differenceOfUpdate
         /// symmetric_differenceOf_update
@@ -573,6 +579,28 @@ test "comprehensive usage" {
     // subsetOf
 
     // supersetOf
+}
+
+test "isDisjoint" {
+    var a = ArraySetManaged(u32).init(std.testing.allocator);
+    defer a.deinit();
+    _ = try a.appendSlice(&.{ 20, 30, 40 });
+
+    var b = ArraySetManaged(u32).init(std.testing.allocator);
+    defer b.deinit();
+    _ = try b.appendSlice(&.{ 202, 303, 403 });
+
+    // Test the true case.
+    try expect(a.isDisjoint(b));
+    try expect(b.isDisjoint(a));
+
+    // Test the false case.
+    var c = ArraySetManaged(u32).init(std.testing.allocator);
+    defer c.deinit();
+    _ = try c.appendSlice(&.{ 20, 30, 400 });
+
+    try expect(!a.isDisjoint(c));
+    try expect(!c.isDisjoint(a));
 }
 
 test "clear/capacity" {
