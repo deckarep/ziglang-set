@@ -36,7 +36,7 @@ This implementation gives credit and acknowledgement to the [Zig language](https
 #### Features
   * Offers idiomatic, generic-based Zig API - allocator support, iterators, capacity hints, clearing, resizing, etc.
   * A few flavors to choose from
-    * NOTE: Future versions of Zig will be deprecating the `managed` variants, and this repo will be following suit.
+    * NOTE: Future versions of Zig [will be deprecating the `managed` variants](https://ziglang.org/download/0.14.0/release-notes.html#Embracing-Unmanaged-Style-Containers), and this repo will be following suit.
     * Hash-based: everyday usecase, optimized for lookups primarily, insertion/removal secondarily - [further reading](https://devlog.hexops.com/2022/zig-hashmaps-explained/)
       * HashSetManaged - initializes with an allocator and holds it internally (built on top of unmanaged)
       * HashSetUnmanaged - does not hold an allocator, smaller footprint
