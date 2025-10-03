@@ -2,7 +2,7 @@
     .name = .ziglangSet,
     .version = "0.0.1",
     .fingerprint = 0x65aa5acd2ef4855,
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.15.1",
 
     .dependencies = .{},
 
