@@ -50,6 +50,7 @@
     const domSectTypes = document.getElementById("sectTypes");
     const domSectValues = document.getElementById("sectValues");
     const domSourceText = document.getElementById("sourceText");
+    const domSourceLineNumbers = document.getElementById("sourceLineNumbers");
     const domStatus = document.getElementById("status");
     const domTableFnErrors = document.getElementById("tableFnErrors");
     const domTldDocs = document.getElementById("tldDocs");
@@ -129,6 +130,11 @@
         domSearch.addEventListener('input', onSearchChange, false);
         window.addEventListener('keydown', onWindowKeyDown, false);
         onHashChange(null);
+        if (domSearch.value) {
+          // user started typing a search query while the page was loading
+          curSearchIndex = -1;
+          startAsyncSearch();
+        }
       });
     });
 
@@ -233,6 +239,7 @@
         href: location.hash,
       }]);
 
+      domSourceLineNumbers.innerHTML = declLineNumbersHtml(decl_index);
       domSourceText.innerHTML = declSourceHtml(decl_index);
 
       domSectSource.classList.remove("hidden");
@@ -384,6 +391,7 @@
       if (members.length !== 0 || fields.length !== 0) {
         renderNamespace(decl_index, members, fields);
       } else {
+        domSourceLineNumbers.innerHTML = declLineNumbersHtml(decl_index);
         domSourceText.innerHTML = declSourceHtml(decl_index);
         domSectSource.classList.remove("hidden");
       }
@@ -414,6 +422,7 @@
         renderErrorSet(base_decl, errorSetNodeList(decl_index, errorSetNode));
       }
 
+      domSourceLineNumbers.innerHTML = declLineNumbersHtml(decl_index);
       domSourceText.innerHTML = declSourceHtml(decl_index);
       domSectSource.classList.remove("hidden");
     }
@@ -428,6 +437,7 @@
         domTldDocs.classList.remove("hidden");
       }
 
+      domSourceLineNumbers.innerHTML = declLineNumbersHtml(decl_index);
       domSourceText.innerHTML = declSourceHtml(decl_index);
       domSectSource.classList.remove("hidden");
     }
@@ -643,6 +653,7 @@
     }
 
     function onHashChange(state) {
+      // Use a non-null state value to prevent the window scrolling if the user goes back to this history entry.
       history.replaceState({}, "");
       navigate(location.hash);
       if (state == null) window.scrollTo({top: 0});
@@ -650,17 +661,21 @@
 
     function onPopState(ev) {
       onHashChange(ev.state);
+      syncDomSearch();
     }
 
     function navigate(location_hash) {
       updateCurNav(location_hash);
-      if (domSearch.value !== curNavSearch) {
-          domSearch.value = curNavSearch;
-      }
       render();
       if (imFeelingLucky) {
           imFeelingLucky = false;
           activateSelectedResult();
+      }
+    }
+
+    function syncDomSearch() {
+      if (domSearch.value !== curNavSearch) {
+        domSearch.value = curNavSearch;
       }
     }
 
@@ -906,6 +921,10 @@
 
     function declSourceHtml(decl_index) {
       return unwrapString(wasm_exports.decl_source_html(decl_index));
+    }
+
+    function declLineNumbersHtml(decl_index) {
+        return unwrapString(wasm_exports.decl_line_numbers_html(decl_index));
     }
 
     function declDoctestHtml(decl_index) {
