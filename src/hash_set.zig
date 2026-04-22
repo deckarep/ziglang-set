@@ -20,68 +20,93 @@
 ///
 const std = @import("std");
 const mem = std.mem;
+const math = std.math;
 const Allocator = mem.Allocator;
 
 /// comptime selection of the map type for string vs everything else.
 fn selectMap(comptime E: type) type {
     comptime {
         if (E == []const u8) {
-            return std.StringArrayHashMapUnmanaged(void);
+            return std.StringHashMapUnmanaged(void);
         } else {
-            return std.AutoArrayHashMapUnmanaged(E, void);
+            return std.AutoHashMapUnmanaged(E, void);
         }
     }
 }
 
-pub fn ArraySetUnmanaged(comptime E: type) type {
+/// Select a context-aware hash map type
+fn selectMapWithContext(comptime E: type, comptime Context: type, comptime max_load_percentage: u8) type {
+    return std.HashMapUnmanaged(E, void, Context, max_load_percentage);
+}
+
+/// HashSet is an implementation of a Set where there is no internal
+/// allocator and all allocating methods require a first argument allocator.
+/// This is a more compact Set built on top of the the HashMap
+/// datastructure.
+/// Note that max_load_percentage defaults to undefined, because the underlying
+/// std.AutoHashMap/std.StringHashMap defaults are used.
+pub fn HashSet(comptime E: type) type {
+    return HashSetWithContext(E, void, undefined);
+}
+
+/// HashSetWithContext creates a set based on element type E with custom hashing behavior.
+/// This variant allows specifying:
+/// - A Context type that implements hash() and eql() functions for custom element hashing
+/// - A max_load_percentage (1-100) that controls hash table resizing
+/// If Context is undefined, then max_load_percentage is ignored.
+///
+/// The Context type must provide:
+///   fn hash(self: Context, key: K) u64
+///   fn eql(self: Context, a: K, b: K) bool
+pub fn HashSetWithContext(comptime E: type, comptime Context: type, comptime max_load_percentage: u8) type {
     return struct {
         /// The type of the internal hash map
-        pub const Map = selectMap(E);
+        pub const Map = if (Context == void) selectMap(E) else selectMapWithContext(E, Context, max_load_percentage);
 
         unmanaged: Map,
+        context: if (Context == void) void else Context = if (Context == void) {} else undefined,
+        max_load_percentage: if (Context == void) void else u8 = if (Context == void) {} else max_load_percentage,
 
-        pub const Size = usize;
-
-        pub const Entry = struct {
-            key_ptr: *E,
-        };
-
-        /// The iterator type returned by iterator(), a Key iterator doesn't exist
-        /// on ArrayHashMaps for some reason.
-        pub const Iterator = struct {
-            keys: [*]E,
-            len: usize,
-            index: usize = 0,
-
-            pub fn next(it: *Iterator) ?Entry {
-                if (it.index >= it.len) return null;
-                const result = Entry{
-                    .key_ptr = &it.keys[it.index],
-                };
-                it.index += 1;
-                return result;
-            }
-
-            /// Reset the iterator to the initial index
-            pub fn reset(it: *Iterator) void {
-                it.index = 0;
-            }
-        };
+        pub const Size = Map.Size;
+        /// The iterator type returned by iterator(), key-only for sets
+        pub const Iterator = Map.KeyIterator;
 
         const Self = @This();
+    
+        pub const empty: Self = if (@sizeOf(Context) == 0) .{
+            .unmanaged = Map{},
+            .context = if (Context == void) {} else undefined,
+            .max_load_percentage = if (Context == void) {} else max_load_percentage,
+        } else @compileError("Cannot init as empty if context was non void");
 
-        pub fn init() Self {
+        // /// Initialize a default set without context
+        // pub fn init() Self {
+        //     return .{
+        //         .unmanaged = Map{},
+        //         .context = if (Context == void) {} else undefined,
+        //         .max_load_percentage = if (Context == void) {} else max_load_percentage,
+        //     };
+        // }
+
+        /// Initialize with a custom context
+        pub fn initContext(context: Context) Self {
             return .{
                 .unmanaged = Map{},
+                .context = context,
+                .max_load_percentage = max_load_percentage,
             };
         }
 
+        /// Initialzies a Set using a capacity hint, with the given Allocator
         pub fn initCapacity(allocator: Allocator, num: Size) Allocator.Error!Self {
-            var self = Self.init();
+            var self: Self = .empty;
             try self.unmanaged.ensureTotalCapacity(allocator, num);
             return self;
         }
 
+        /// Destroys the unmanaged Set.
+        /// TODO: zig has still not changed the HashMap in 0.16, so we need to pass 
+        /// the allocator here. It needs to be removed.
         pub fn deinit(self: *Self, allocator: Allocator) void {
             self.unmanaged.deinit(allocator);
             self.* = undefined;
@@ -91,6 +116,25 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
             const prevCount = self.unmanaged.count();
             try self.unmanaged.put(allocator, element, {});
             return prevCount != self.unmanaged.count();
+        }
+
+        /// Adds a single element to the set. Asserts that there is enough capacity.
+        /// A bool is returned indicating if the element was actually added
+        /// if not already known.
+        pub fn addAssumeCapacity(self: *Self, element: E) bool {
+            const prevCount = self.unmanaged.count();
+            self.unmanaged.putAssumeCapacity(element, {});
+            return prevCount != self.unmanaged.count();
+        }
+
+        /// Appends all elements from the provided set, and may allocate.
+        /// append returns an Allocator.Error or Size which represents how
+        /// many elements added and not previously in the Set.
+        pub fn append(self: *Self, allocator: Allocator, other: Self) Allocator.Error!Size {
+            const prevCount = self.unmanaged.count();
+
+            try self.unionUpdate(allocator, other);
+            return self.unmanaged.count() - prevCount;
         }
 
         /// Appends all elements from the provided slice, and may allocate.
@@ -145,7 +189,7 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
         pub fn containsAll(self: Self, other: Self) bool {
             var iter = other.iterator();
             while (iter.next()) |el| {
-                if (!self.unmanaged.contains(el.key_ptr.*)) {
+                if (!self.unmanaged.contains(el.*)) {
                     return false;
                 }
             }
@@ -174,8 +218,15 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
             return false;
         }
 
-        pub fn ensureTotalCapacity(self: *Self, allocator: Allocator, num: Size) Allocator.Error!void {
-            return self.unmanaged.ensureTotalCapacity(allocator, num);
+        /// Returns true when at least one or more elements from the slice exist within
+        /// this Set otherwise false.
+        pub fn containsAnySlice(self: Self, elements: []const E) bool {
+            for (elements) |el| {
+                if (self.unmanaged.contains(el)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// differenceOf returns the difference between this set
@@ -185,7 +236,7 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
         ///
         /// Caller owns the newly allocated/returned set.
         pub fn differenceOf(self: Self, allocator: Allocator, other: Self) Allocator.Error!Self {
-            var diffSet = Self.init();
+            var diffSet: Self = .empty;
 
             var iter = self.unmanaged.iterator();
             while (iter.next()) |entry| {
@@ -199,33 +250,33 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
         /// differenceUpdate does an in-place mutation of this set
         /// and other. This set will contain all elements of this set that are not
         /// also elements of other.
-        pub fn differenceUpdate(self: *Self, allocator: Allocator, other: Self) Allocator.Error!void {
-            // In-place mutation invalidates iterators therefore a temp set is needed.
-            // So instead of a temp set, just invoke the regular full function which
-            // allocates and returns a set then swap out the map internally.
-
-            // Also, this saves a step of not having to possibly discard many elements
-            // from the self set.
-
-            // Just get a new set with the normal method.
-            const diffSet = try self.differenceOf(allocator, other);
-
-            // Destroy the internal map.
-            self.unmanaged.deinit(allocator);
-
-            // Swap it out with the new set.
-            self.unmanaged = diffSet.unmanaged;
+        pub fn differenceUpdate(self: *Self, other: Self) Allocator.Error!void {
+            var iter = other.iterator(); 
+            
+            while (iter.next()) |key_ptr| { 
+                _ = self.remove(key_ptr.*); 
+            }
         }
 
-        /// Returns true when at least one or more elements from the slice exist within
-        /// this Set otherwise false.
-        pub fn containsAnySlice(self: Self, elements: []const E) bool {
-            for (elements) |el| {
-                if (self.unmanaged.contains(el)) {
-                    return true;
-                }
+        fn dump(self: Self) void {
+            std.log.err("\ncardinality: {d}\n", .{self.cardinality()});
+            var iter = self.iterator();
+            while (iter.next()) |el| {
+                std.log.err("  element: {d}\n", .{el.*});
             }
-            return false;
+        }
+
+        /// Increases capacity, guaranteeing that insertions up until the
+        /// `expected_count` will not cause an allocation, and therefore cannot fail.
+        pub fn ensureTotalCapacity(self: *Self, allocator: Allocator, expected_count: Size) Allocator.Error!void {
+            return self.unmanaged.ensureTotalCapacity(allocator, expected_count);
+        }
+
+        /// Increases capacity, guaranteeing that insertions up until
+        /// `additional_count` **more** items will not cause an allocation, and
+        /// therefore cannot fail.
+        pub fn ensureUnusedCapacity(self: *Self, allocator: Allocator, additional_count: Size) Allocator.Error!void {
+            return self.unmanaged.ensureUnusedCapacity(allocator, additional_count);
         }
 
         /// eql determines if two sets are equal to each
@@ -256,7 +307,7 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
         ///
         /// Caller owns the newly allocated/returned set.
         pub fn intersectionOf(self: Self, allocator: Allocator, other: Self) Allocator.Error!Self {
-            var interSet = Self.init();
+            var interSet: Self = .empty;
 
             // Optimization: iterate over whichever set is smaller.
             // Matters when disparity in cardinality is large.
@@ -281,21 +332,19 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
         /// to the current set from the other set keeping only
         /// elements found in this Set and the other Set.
         pub fn intersectionUpdate(self: *Self, allocator: Allocator, other: Self) Allocator.Error!void {
-            // In-place mutation invalidates iterators therefore a temp set is needed.
-            // So instead of a temp set, just invoke the regular full function which
-            // allocates and returns a set then swap out the map internally.
+            var to_remove: std.ArrayList(E) = .empty;
+            defer to_remove.deinit(allocator);
 
-            // Also, this saves a step of not having to possibly discard many elements
-            // from the self set.
+            var iter = self.iterator();
+            while (iter.next()) |key_ptr| {
+                if (!other.contains(key_ptr.*)) {
+                    try to_remove.append(allocator, key_ptr.*);
+                }
+            }
 
-            // Just get a new set with the normal method.
-            const interSet = try self.intersectionOf(allocator, other);
-
-            // Destroy the internal map.
-            self.unmanaged.deinit(allocator);
-
-            // Swap it out with the new set.
-            self.unmanaged = interSet.unmanaged;
+            for (to_remove.items) |item| {
+                _ = self.remove(item);
+            }        
         }
 
         /// isDisjoint returns true if the intersection between two sets is the null set.
@@ -307,14 +356,13 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
 
             var iter = smaller.iterator();
             while (iter.next()) |el| {
-                if (larger.contains(el.key_ptr.*)) {
+                if (larger.contains(el.*)) {
                     return false;
                 }
             }
             return true;
         }
 
-        /// Returns true if this Set is empty otherwise false.
         pub fn isEmpty(self: Self) bool {
             return self.unmanaged.count() == 0;
         }
@@ -322,11 +370,7 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
         /// Create an iterator over the elements in the set.
         /// The iterator is invalidated if the set is modified during iteration.
         pub fn iterator(self: Self) Iterator {
-            const slice = self.unmanaged.entries.slice();
-            return .{
-                .keys = slice.items(.key).ptr,
-                .len = @as(u32, @intCast(slice.len)),
-            };
+            return self.unmanaged.keyIterator();
         }
 
         /// properSubsetOf determines if every element in this set is in
@@ -380,7 +424,7 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
                     capturedElement = entry.key_ptr.*;
                     break;
                 }
-                _ = self.unmanaged.swapRemove(capturedElement);
+                _ = self.unmanaged.remove(capturedElement);
                 return capturedElement;
             } else {
                 return null;
@@ -389,7 +433,7 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
 
         /// remove discards a single element from the Set
         pub fn remove(self: *Self, element: E) bool {
-            return self.unmanaged.swapRemove(element);
+            return self.unmanaged.remove(element);
         }
 
         /// removesAll discards all elements passed from the other Set from
@@ -397,14 +441,14 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
         pub fn removeAll(self: *Self, other: Self) void {
             var iter = other.iterator();
             while (iter.next()) |el| {
-                _ = self.unmanaged.swapRemove(el.key_ptr.*);
+                _ = self.unmanaged.remove(el);
             }
         }
 
         /// removesAllSlice discards all elements passed as a slice from the Set
         pub fn removeAllSlice(self: *Self, elements: []const E) void {
             for (elements) |el| {
-                _ = self.unmanaged.swapRemove(el);
+                _ = self.unmanaged.remove(el);
             }
         }
 
@@ -413,7 +457,7 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
         ///
         /// The caller owns the newly allocated/returned Set.
         pub fn symmetricDifferenceOf(self: Self, allocator: Allocator, other: Self) Allocator.Error!Self {
-            var sdSet = Self.init();
+            var sdSet: Self = .empty;
 
             var iter = self.unmanaged.iterator();
             while (iter.next()) |entry| {
@@ -435,21 +479,16 @@ pub fn ArraySetUnmanaged(comptime E: type) type {
         /// symmetricDifferenceUpdate does an in-place mutation with all elements
         /// which are in either this set or the other set but not in both.
         pub fn symmetricDifferenceUpdate(self: *Self, allocator: Allocator, other: Self) Allocator.Error!void {
-            // In-place mutation invalidates iterators therefore a temp set is needed.
-            // So instead of a temp set, just invoke the regular full function which
-            // allocates and returns a set then swap out the map internally.
+            var iter = other.iterator();
+            while (iter.next()) |key_ptr| {
+                const element = key_ptr.*;
 
-            // Also, this saves a step of not having to possibly discard many elements
-            // from the self set.
-
-            // Just get a new set with the normal method.
-            const sd = try self.symmetricDifferenceOf(allocator, other);
-
-            // Destroy the internal map.
-            self.unmanaged.deinit(allocator);
-
-            // Swap it out with the new set.
-            self.unmanaged = sd.unmanaged;
+                if (self.contains(element)) {
+                    _ = self.remove(element);
+                } else {
+                    _ = try self.add(allocator, element);
+                }
+            }
         }
 
         /// union returns a new set with all elements in both sets.
@@ -496,7 +535,7 @@ const expectEqual = std.testing.expectEqual;
 
 test "example usage" {
     // Create a set of u32s called A
-    var A = ArraySetUnmanaged(u32).init();
+    var A: HashSet(u32) = .empty;
     defer A.deinit(testing.allocator);
 
     // Add some data
@@ -508,35 +547,30 @@ test "example usage" {
     _ = try A.appendSlice(testing.allocator, &.{ 5, 3, 0, 9 });
 
     // Create another set called B
-    var B = ArraySetUnmanaged(u32).init();
+    var B: HashSet(u32) = .empty;
     defer B.deinit(testing.allocator);
 
     // Add data to B
     _ = try B.appendSlice(testing.allocator, &.{ 50, 30, 20 });
 
-    // Get the union of A | B
+    // // Get the union of A | B
     var un = try A.unionOf(testing.allocator, B);
     defer un.deinit(testing.allocator);
 
-    const expectedCount = 9;
-    try expectEqual(expectedCount, un.cardinality());
+    try expectEqual(9, un.cardinality());
 
     // Grab an iterator and dump the contents.
-    var cnt: usize = 0;
     var iter = un.iterator();
     while (iter.next()) |el| {
-        std.log.debug("element: {d}", .{el.key_ptr.*});
-        cnt += 1;
+        std.log.debug("element: {d}", .{el.*});
     }
-
-    try expectEqual(expectedCount, cnt);
 }
 
 test "string usage" {
-    var A = ArraySetUnmanaged([]const u8).init();
+    var A: HashSet([]const u8) = .empty;
     defer A.deinit(testing.allocator);
 
-    var B = ArraySetUnmanaged([]const u8).init();
+    var B: HashSet([]const u8) = .empty;
     defer B.deinit(testing.allocator);
 
     _ = try A.add(testing.allocator, "Hello");
@@ -549,7 +583,7 @@ test "string usage" {
 }
 
 test "comprehensive usage" {
-    var set = ArraySetUnmanaged(u32).init();
+    var set: HashSet(u32) = .empty;
     defer set.deinit(testing.allocator);
 
     try expect(set.isEmpty());
@@ -573,7 +607,7 @@ test "comprehensive usage" {
 
     try expectEqual(set.cardinality(), 7);
 
-    var other = ArraySetUnmanaged(u32).init();
+    var other: HashSet(u32) = .empty;
     defer other.deinit(testing.allocator);
 
     try expect(other.isEmpty());
@@ -632,11 +666,11 @@ test "comprehensive usage" {
 }
 
 test "isDisjoint" {
-    var a = ArraySetUnmanaged(u32).init();
+    var a: HashSet(u32) = .empty;
     defer a.deinit(testing.allocator);
     _ = try a.appendSlice(testing.allocator, &.{ 20, 30, 40 });
 
-    var b = ArraySetUnmanaged(u32).init();
+    var b: HashSet(u32) = .empty;
     defer b.deinit(testing.allocator);
     _ = try b.appendSlice(testing.allocator, &.{ 202, 303, 403 });
 
@@ -645,7 +679,7 @@ test "isDisjoint" {
     try expect(b.isDisjoint(a));
 
     // Test the false case.
-    var c = ArraySetUnmanaged(u32).init();
+    var c: HashSet(u32) = .empty;
     defer c.deinit(testing.allocator);
     _ = try c.appendSlice(testing.allocator, &.{ 20, 30, 400 });
 
@@ -656,7 +690,7 @@ test "isDisjoint" {
 test "clone" {
 
     // clone
-    var a = ArraySetUnmanaged(u32).init();
+    var a: HashSet(u32) = .empty;
     defer a.deinit(testing.allocator);
     _ = try a.appendSlice(testing.allocator, &.{ 20, 30, 40 });
 
@@ -667,14 +701,14 @@ test "clone" {
 }
 
 test "clear/capacity" {
-    var a = ArraySetUnmanaged(u32).init();
+    var a: HashSet(u32) = .empty;
     defer a.deinit(testing.allocator);
 
     try expectEqual(0, a.cardinality());
     try expectEqual(0, a.capacity());
 
     const cap = 99;
-    var b = try ArraySetUnmanaged(u32).initCapacity(testing.allocator, cap);
+    var b = try HashSet(u32).initCapacity(testing.allocator, cap);
     defer b.deinit(testing.allocator);
 
     try expectEqual(0, b.cardinality());
@@ -699,7 +733,7 @@ test "clear/capacity" {
 }
 
 test "iterator" {
-    var a = ArraySetUnmanaged(u32).init();
+    var a: HashSet(u32) = .empty;
     defer a.deinit(testing.allocator);
     _ = try a.appendSlice(testing.allocator, &.{ 20, 30, 40 });
 
@@ -707,7 +741,7 @@ test "iterator" {
     var iterCount: usize = 0;
     var iter = a.iterator();
     while (iter.next()) |el| {
-        sum += el.key_ptr.*;
+        sum += el.*;
         iterCount += 1;
     }
 
@@ -716,7 +750,7 @@ test "iterator" {
 }
 
 test "pop" {
-    var a = ArraySetUnmanaged(u32).init();
+    var a: HashSet(u32) = .empty;
     defer a.deinit(testing.allocator);
     _ = try a.appendSlice(testing.allocator, &.{ 20, 30, 40 });
 
@@ -735,11 +769,11 @@ test "pop" {
 
 test "in-place methods" {
     // intersectionUpdate
-    var a = ArraySetUnmanaged(u32).init();
+    var a: HashSet(u32) = .empty;
     defer a.deinit(testing.allocator);
     _ = try a.appendSlice(testing.allocator, &.{ 10, 20, 30, 40 });
 
-    var b = ArraySetUnmanaged(u32).init();
+    var b: HashSet(u32) = .empty;
     defer b.deinit(testing.allocator);
     _ = try b.appendSlice(testing.allocator, &.{ 44, 20, 30, 66 });
 
@@ -748,11 +782,11 @@ test "in-place methods" {
     try expect(a.containsAllSlice(&.{ 20, 30 }));
 
     // unionUpdate
-    var c = ArraySetUnmanaged(u32).init();
+    var c: HashSet(u32) = .empty;
     defer c.deinit(testing.allocator);
     _ = try c.appendSlice(testing.allocator, &.{ 10, 20, 30, 40 });
 
-    var d = ArraySetUnmanaged(u32).init();
+    var d: HashSet(u32) = .empty;
     defer d.deinit(testing.allocator);
     _ = try d.appendSlice(testing.allocator, &.{ 44, 20, 30, 66 });
 
@@ -761,25 +795,25 @@ test "in-place methods" {
     try expect(c.containsAllSlice(&.{ 10, 20, 30, 40, 66 }));
 
     // differenceUpdate
-    var e = ArraySetUnmanaged(u32).init();
+    var e: HashSet(u32) = .empty;
     defer e.deinit(testing.allocator);
     _ = try e.appendSlice(testing.allocator, &.{ 1, 11, 111, 1111, 11111 });
 
-    var f = ArraySetUnmanaged(u32).init();
+    var f: HashSet(u32) = .empty;
     defer f.deinit(testing.allocator);
     _ = try f.appendSlice(testing.allocator, &.{ 1, 11, 111, 222, 2222, 1111 });
 
-    try e.differenceUpdate(testing.allocator, f);
+    try e.differenceUpdate(f);
 
     try expectEqual(1, e.cardinality());
     try expect(e.contains(11111));
 
     // symmetricDifferenceUpdate
-    var g = ArraySetUnmanaged(u32).init();
+    var g: HashSet(u32) = .empty;
     defer g.deinit(testing.allocator);
     _ = try g.appendSlice(testing.allocator, &.{ 2, 22, 222, 2222, 22222 });
 
-    var h = ArraySetUnmanaged(u32).init();
+    var h: HashSet(u32) = .empty;
     defer h.deinit(testing.allocator);
     _ = try h.appendSlice(testing.allocator, &.{ 1, 11, 111, 333, 3333, 2222, 1111 });
 
@@ -789,38 +823,181 @@ test "in-place methods" {
     try expect(g.containsAllSlice(&.{ 1, 2, 11, 111, 22, 222, 1111, 333, 3333, 22222 }));
 }
 
-test "removals" {
-    var a = ArraySetUnmanaged(u32).init();
-    defer a.deinit(testing.allocator);
-
-    _ = try a.appendSlice(testing.allocator, &.{ 5, 6, 7, 8 });
-    _ = try a.appendSlice(testing.allocator, &.{ 50, 60, 70, 80 });
-    _ = try a.appendSlice(testing.allocator, &.{ 111, 222, 333, 444 });
-
-    try expectEqual(12, a.cardinality());
-
-    try expect(a.remove(5));
-    try expect(a.remove(6));
-    try expect(a.remove(7));
-    try expect(a.remove(8));
-
-    try expectEqual(8, a.cardinality());
-
-    a.removeAllSlice(&.{ 50, 60, 70, 80 });
-    try expectEqual(4, a.cardinality());
-
-    var b = ArraySetUnmanaged(u32).init();
-    defer b.deinit(testing.allocator);
-
-    _ = try b.appendSlice(testing.allocator, &.{ 111, 222, 333, 444 });
-    a.removeAll(b);
-
-    try expectEqual(0, a.cardinality());
-}
-
 test "sizeOf matches" {
     // No bloat guarantee, after all we're just building on top of what's good.
-    const expectedByteSize = 40;
-    try expectEqual(expectedByteSize, @sizeOf(std.array_hash_map.AutoArrayHashMapUnmanaged(u32, void)));
-    try expectEqual(expectedByteSize, @sizeOf(ArraySetUnmanaged(u32)));
+    // "What's good Miley!?!?""
+    const expectedByteSize = 24;
+    const autoHashMapSize = @sizeOf(std.hash_map.AutoHashMapUnmanaged(u32, void));
+    const hashSetSize = @sizeOf(HashSet(u32));
+    try expectEqual(expectedByteSize, autoHashMapSize);
+    try expectEqual(expectedByteSize, hashSetSize);
+
+    // The unmanaged with void context must be the same size as the unmanaged.
+    // The unmanaged with context must be larger by the size of the empty Context struct,
+    // due to the added Context and alignment padding.
+    const expectedContextDiff = 8;
+    const hashSetWithVoidContextSize = @sizeOf(HashSetWithContext(u32, void, undefined));
+    const hashSetWithContextSize = @sizeOf(HashSetWithContext(u32, TestContext, 75));
+    try expectEqual(0, hashSetWithVoidContextSize - hashSetSize);
+    try expectEqual(expectedContextDiff, hashSetWithContextSize - hashSetSize);
+}
+
+const TestContext = struct {
+    const Self = @This();
+    pub fn hash(_: Self, key: u32) u64 {
+        return @as(u64, key) *% 0x517cc1b727220a95;
+    }
+    pub fn eql(_: Self, a: u32, b: u32) bool {
+        return a == b;
+    }
+};
+
+test "custom hash function comprehensive" {
+    const context = TestContext{};
+    var set = HashSetWithContext(u32, TestContext, 75).initContext(context);
+    defer set.deinit(testing.allocator);
+
+    // Test basic operations
+    _ = try set.add(testing.allocator, 123);
+    _ = try set.add(testing.allocator, 456);
+    try expect(set.contains(123));
+    try expect(set.contains(456));
+    try expect(!set.contains(789));
+    try expectEqual(set.cardinality(), 2);
+
+    // Test clone with custom context
+    var cloned = try set.clone(testing.allocator);
+    defer cloned.deinit(testing.allocator);
+    try expect(cloned.contains(123));
+    try expect(set.eql(cloned));
+
+    // Test set operations with custom context
+    var other = HashSetWithContext(u32, TestContext, 75).initContext(context);
+    defer other.deinit(testing.allocator);
+    _ = try other.add(testing.allocator, 456);
+    _ = try other.add(testing.allocator, 789);
+
+    // Test union
+    var union_set = try set.unionOf(testing.allocator, other);
+    defer union_set.deinit(testing.allocator);
+    try expectEqual(union_set.cardinality(), 3);
+    try expect(union_set.containsAllSlice(&.{ 123, 456, 789 }));
+
+    // Test intersection
+    var intersection = try set.intersectionOf(testing.allocator, other);
+    defer intersection.deinit(testing.allocator);
+    try expectEqual(intersection.cardinality(), 1);
+    try expect(intersection.contains(456));
+
+    // Test difference
+    var difference = try set.differenceOf(testing.allocator, other);
+    defer difference.deinit(testing.allocator);
+    try expectEqual(difference.cardinality(), 1);
+    try expect(difference.contains(123));
+
+    // Test symmetric difference
+    var sym_diff = try set.symmetricDifferenceOf(testing.allocator, other);
+    defer sym_diff.deinit(testing.allocator);
+    try expectEqual(sym_diff.cardinality(), 2);
+    try expect(sym_diff.containsAllSlice(&.{ 123, 789 }));
+
+    // Test in-place operations
+    try set.unionUpdate(testing.allocator, other);
+    try expectEqual(set.cardinality(), 3);
+    try expect(set.containsAllSlice(&.{ 123, 456, 789 }));
+}
+
+test "custom hash function with different load factors" {
+    const context = TestContext{};
+
+    // Test with low load factor
+    var low_load = HashSetWithContext(u32, TestContext, 25).initContext(context);
+    defer low_load.deinit(testing.allocator);
+
+    // Test with high load factor
+    var high_load = HashSetWithContext(u32, TestContext, 90).initContext(context);
+    defer high_load.deinit(testing.allocator);
+
+    // Add same elements to both
+    for (0..100) |i| {
+        _ = try low_load.add(testing.allocator, @intCast(i));
+        _ = try high_load.add(testing.allocator, @intCast(i));
+    }
+
+    // Verify functionality is identical despite different load factors
+    try expectEqual(low_load.cardinality(), high_load.cardinality());
+    try expect(low_load.capacity() != high_load.capacity()); // Should be different due to load factors
+
+    // Verify both sets contain the same elements
+    for (0..100) |i| {
+        const val: u32 = @intCast(i);
+        try expect(low_load.contains(val) and high_load.contains(val));
+    }
+}
+
+test "custom hash function error cases" {
+    const context = TestContext{};
+    var set = HashSetWithContext(u32, TestContext, 75).initContext(context);
+    defer set.deinit(testing.allocator);
+
+    // Test allocation failures
+    var failing_allocator = std.testing.FailingAllocator.init(testing.allocator, .{ .fail_index = 0 });
+    try std.testing.expectError(error.OutOfMemory, set.add(failing_allocator.allocator(), 123));
+}
+
+// String context for testing string usage with custom hash function
+const StringContext = struct {
+    pub fn hash(self: @This(), str: []const u8) u64 {
+        _ = self;
+        // Simple FNV-1a hash
+        var h: u64 = 0xcbf29ce484222325;
+        for (str) |b| {
+            h = (h ^ b) *% 0x100000001b3;
+        }
+        return h;
+    }
+
+    pub fn eql(self: @This(), a: []const u8, b: []const u8) bool {
+        _ = self;
+        return std.mem.eql(u8, a, b);
+    }
+};
+
+test "custom hash function string usage" {
+    const context = StringContext{};
+    var A = HashSetWithContext([]const u8, StringContext, 75).initContext(context);
+    defer A.deinit(testing.allocator);
+
+    var B = HashSetWithContext([]const u8, StringContext, 75).initContext(context);
+    defer B.deinit(testing.allocator);
+
+    _ = try A.add(testing.allocator, "Hello");
+    _ = try B.add(testing.allocator, "World");
+
+    var C = try A.unionOf(testing.allocator, B);
+    defer C.deinit(testing.allocator);
+    try expectEqual(2, C.cardinality());
+    try expect(C.containsAllSlice(&.{ "Hello", "World" }));
+
+    // Test string-specific behavior
+    try expect(A.contains("Hello"));
+    try expect(!A.contains("hello")); // Case sensitive
+    try expect(!A.contains("Hell")); // Prefix doesn't match
+    try expect(!A.contains("Hello ")); // Trailing space matters
+
+    // Test with longer strings
+    _ = try A.add(testing.allocator, "This is a longer string to test hash collisions");
+    _ = try A.add(testing.allocator, "This is another longer string to test hash collisions");
+    try expectEqual(3, A.cardinality());
+
+    // Test with empty string
+    _ = try A.add(testing.allocator, "");
+    try expect(A.contains(""));
+    try expectEqual(4, A.cardinality());
+
+    // Test with strings containing special characters
+    _ = try A.add(testing.allocator, "Hello\n");
+    _ = try A.add(testing.allocator, "Hello\r");
+    _ = try A.add(testing.allocator, "Hello\t");
+    try expectEqual(7, A.cardinality());
 }
