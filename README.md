@@ -220,7 +220,7 @@ zig build test
 
 ```sh
 # With Zig installed:
-zigup build docs && cp -a zig-out/docs/. docs/
+zig build docs && cp -a zig-out/docs/. docs/
 
 # Alternatively, using Zigup:
 zigup run <zig-version> build docs && cp -a zig-out/docs/. docs/
