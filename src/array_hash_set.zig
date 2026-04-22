@@ -1,6 +1,6 @@
 /// Open Source Initiative OSI - The MIT License (MIT):Licensing
 /// The MIT License (MIT)
-/// Copyright (c) 2025 Ralph Caraveo (deckarep@gmail.com)
+/// Copyright (c) 2026 Ralph Caraveo (deckarep@gmail.com)
 /// Permission is hereby granted, free of charge, to any person obtaining a copy of
 /// this software and associated documentation files (the "Software"), to deal in
 /// the Software without restriction, including without limitation the rights to
@@ -69,11 +69,11 @@ pub fn ArraySet(comptime E: type) type {
         };
 
         const Self = @This();
-    
+
         pub const empty: Self = .{
             .unmanaged = Map{},
         };
-        
+
         // pub fn init() Self {
         //     return .{
         //         .unmanaged = Map{},
@@ -86,7 +86,7 @@ pub fn ArraySet(comptime E: type) type {
             return self;
         }
 
-        /// TODO: zig has still not changed neither of the two maps from selectMap 0.16, 
+        /// TODO: zig has still not changed neither of the two maps from selectMap 0.16,
         /// so we need to pass the allocator to deinit that.
         pub fn deinit(self: *Self, allocator: Allocator) void {
             self.unmanaged.deinit(allocator);
@@ -827,6 +827,6 @@ test "removals" {
 test "sizeOf matches" {
     // No bloat guarantee, after all we're just building on top of what's good.
     const expectedByteSize = 40;
-    try expectEqual(expectedByteSize, @sizeOf(std.array_hash_map.AutoArrayHashMapUnmanaged(u32, void)));
+    try expectEqual(expectedByteSize, @sizeOf(std.AutoArrayHashMapUnmanaged(u32, void)));
     try expectEqual(expectedByteSize, @sizeOf(ArraySet(u32)));
 }
