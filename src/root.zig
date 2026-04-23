@@ -1,6 +1,6 @@
 /// Open Source Initiative OSI - The MIT License (MIT):Licensing
 /// The MIT License (MIT)
-/// Copyright (c) 2025 Ralph Caraveo (deckarep@gmail.com)
+/// Copyright (c) 2026 Ralph Caraveo (deckarep@gmail.com)
 /// Permission is hereby granted, free of charge, to any person obtaining a copy of
 /// this software and associated documentation files (the "Software"), to deal in
 /// the Software without restriction, including without limitation the rights to
@@ -18,7 +18,6 @@
 /// SOFTWARE.
 ///
 ///
-
 /// Set is just a short convenient "default" alias. If you don't know
 /// which to pick, just use Set.
 pub const Set = HashSet;
@@ -29,7 +28,6 @@ pub const HashSetContext = @import("hash_set.zig").HashSetWithContext;
 
 /// This is a bit more specialized and optimized for heavy iteration.
 pub const ArraySet = @import("array_hash_set.zig").ArraySet;
-
 
 test "tests" {
     _ = @import("hash_set.zig");

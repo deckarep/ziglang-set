@@ -1,6 +1,6 @@
 /// Open Source Initiative OSI - The MIT License (MIT):Licensing
 /// The MIT License (MIT)
-/// Copyright (c) 2025 Ralph Caraveo (deckarep@gmail.com)
+/// Copyright (c) 2026 Ralph Caraveo (deckarep@gmail.com)
 /// Permission is hereby granted, free of charge, to any person obtaining a copy of
 /// this software and associated documentation files (the "Software"), to deal in
 /// the Software without restriction, including without limitation the rights to
@@ -72,7 +72,7 @@ pub fn HashSetWithContext(comptime E: type, comptime Context: type, comptime max
         pub const Iterator = Map.KeyIterator;
 
         const Self = @This();
-    
+
         pub const empty: Self = if (@sizeOf(Context) == 0) .{
             .unmanaged = Map{},
             .context = if (Context == void) {} else undefined,
@@ -105,7 +105,7 @@ pub fn HashSetWithContext(comptime E: type, comptime Context: type, comptime max
         }
 
         /// Destroys the unmanaged Set.
-        /// TODO: zig has still not changed the HashMap in 0.16, so we need to pass 
+        /// TODO: zig has still not changed the HashMap in 0.16, so we need to pass
         /// the allocator here. It needs to be removed.
         pub fn deinit(self: *Self, allocator: Allocator) void {
             self.unmanaged.deinit(allocator);
@@ -251,10 +251,10 @@ pub fn HashSetWithContext(comptime E: type, comptime Context: type, comptime max
         /// and other. This set will contain all elements of this set that are not
         /// also elements of other.
         pub fn differenceUpdate(self: *Self, other: Self) Allocator.Error!void {
-            var iter = other.iterator(); 
-            
-            while (iter.next()) |key_ptr| { 
-                _ = self.remove(key_ptr.*); 
+            var iter = other.iterator();
+
+            while (iter.next()) |key_ptr| {
+                _ = self.remove(key_ptr.*);
             }
         }
 
@@ -344,7 +344,7 @@ pub fn HashSetWithContext(comptime E: type, comptime Context: type, comptime max
 
             for (to_remove.items) |item| {
                 _ = self.remove(item);
-            }        
+            }
         }
 
         /// isDisjoint returns true if the intersection between two sets is the null set.
