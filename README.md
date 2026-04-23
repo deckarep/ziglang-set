@@ -19,15 +19,17 @@ Ziglang-Set: a generic and general-purpose Set implementation for Zig. <br/> ðŸš
 
 #
 
+A set offers a fast way to manipulate data and avoid excessive looping.
+
 Zig currently [does not have](https://github.com/ziglang/zig/issues/6919) a built-in, general purpose Set data structure at this point in time. Until it does, try this!
 
-Rationale: It may be common knowledge that a dictionary, map or hashset can be used as a set with a value of `void`. While this is true, there's a lot to think about in terms of supporting all the common set operations in a performant and correct way and there's no good reason why a common module for this shouldn't exist. After studying the Zig stdlib, I'm hoping this implementation can fill that gap and provide some value.
+Rationale: It may be common knowledge that a dictionary, map or hashset can be used as a set with a value of `void`. While this is true, there's a lot to think about in terms of supporting all the common set operations in a performant and correct way and there's no good reason why a common module for this shouldn't exist. I'm hoping this implementation can fill that gap and provide some value after being modeled similar to other collections in Zig's stdlib.
 
 #
 
-This module offers a Set implementation built in the same vein and spirit of the other data structures within the Zig standard library. This is my attempt to model one that can get better over time and grow with community interest and support. See a problem, file a bug! Or better yet contribute and let's build the best implementation together.
+This module offers a Set implementation built in the same vein and spirit of the other data structures within the Zig standard library. This is an attempt to model one that can get better over time and grow with community interest and support. See a problem, file a bug! Or better yet contribute and let's build the best implementation together.
 
-I am the original author of the popular Go based set package: [golang-set](https://github.com/deckarep/golang-set) that is used by software components built by Docker, 1Password, Ethereum, SendGrid, CrowdStrike and HashiCorp. At just shy of `4.5k stars`, I figured I'd take a crack at building a comprehensive and generic Zig-based set that goes above and beyond the original Go implementation. After using Zig for over 3+ years on personal projects, I thought it was time that Zig had a robust Set implementation for itself.
+I am the original author of a popular Go based set package: [golang-set](https://github.com/deckarep/golang-set) that is used by software components built by Docker, 1Password, Ethereum, SendGrid, CrowdStrike and HashiCorp. At just shy of `4.7k stars`, I figured I'd take a crack at building a comprehensive and generic Zig-based set that goes above and beyond the original Go implementation. After using Zig for over 3+ years on personal projects, I thought it was time that Zig had a robust Set implementation for itself.
 
 This implementation gives credit and acknowledgement to the [Zig language](https://ziglang.org) and powerful [Std Library](https://ziglang.org/documentation/master/std/#std) [HashMap](https://ziglang.org/documentation/master/std/#std.hash_map.HashMap) data structure of which this set implementation is built on top of. Without that, this probably wouldn't exist. Efforts will be made to keep the Ziglang Set code fast and straightforward but this Set's raw speed will largely be bounded by the performance of the Zig HashMap of which it is built on top of.
 
@@ -38,11 +40,7 @@ This implementation gives credit and acknowledgement to the [Zig language](https
   * A few flavors to choose from
     * NOTE: Future versions of Zig [will be deprecating the `managed` variants](https://ziglang.org/download/0.14.0/release-notes.html#Embracing-Unmanaged-Style-Containers), and this repo will be following suit.
     * Hash-based: everyday usecase, optimized for lookups primarily, insertion/removal secondarily - [further reading](https://devlog.hexops.com/2022/zig-hashmaps-explained/)
-      * HashSetManaged - initializes with an allocator and holds it internally (built on top of unmanaged)
-      * HashSetUnmanaged - does not hold an allocator, smaller footprint
     * Array-based: more specialized, iteration much faster, insertion order preserved, indexing into underylying data - [further reading](https://devlog.hexops.com/2022/zig-hashmaps-explained/)
-      * ArrayHashSetManaged - initializes with an allocator and holds it internally (built on top of unmanaged)
-      * ArrayHashSetUnmanaged - does not hold an allocator, smaller footprint
   * Common set operations
     * add, append, appendSlice
     * remove, removeAll
@@ -64,10 +62,9 @@ This implementation gives credit and acknowledgement to the [Zig language](https
   * Custom hash function support
   * "string" support
   * Benchmarks
+
 #
-#### Why use a set?
-  * A set offers a fast way to manipulate data and avoid excessive looping. Look into it as there is already tons of literature on the advantages of having a set in your arsenal of tools.
-#
+
 #### Example
 ```zig
     // import the namespace.
