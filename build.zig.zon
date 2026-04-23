@@ -12,7 +12,6 @@
         "build.zig.zon",
         "src/hash_set.zig",
         "src/array_hash_set.zig",
-        "src/main.zig",
         "src/root.zig",
     },
 }
