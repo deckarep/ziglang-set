@@ -127,6 +127,20 @@ pub fn HashSetWithContext(comptime E: type, comptime Context: type, comptime max
             return prevCount != self.unmanaged.count();
         }
 
+        /// Appends an element without checking if it was inside the set.
+        /// Adding an element that already was in the set will corrupt the data structure.
+        /// Faster than add, pretty unsafe.
+        pub fn addAssumeNotIn(self: *Self, allocator: Allocator, element: E) Allocator.Error!void {
+            try self.unmanaged.putNoClobber(allocator, element, {});
+        }
+
+        /// Appends an element without checking if it was inside the set.
+        /// Adding an element that already was in the set will corrupt the data structure.
+        /// Faster than add, pretty unsafe.
+        pub fn addAssumeNotInAndCapacity(self: *Self, element: E) void {
+            self.unmanaged.putAssumeCapacityNoClobber(element, {});
+        }
+
         /// Appends all elements from the provided set, and may allocate.
         /// append returns an Allocator.Error or Size which represents how
         /// many elements added and not previously in the Set.
@@ -1000,4 +1014,24 @@ test "custom hash function string usage" {
     _ = try A.add(testing.allocator, "Hello\r");
     _ = try A.add(testing.allocator, "Hello\t");
     try expectEqual(7, A.cardinality());
+}
+
+test "add assume not in" {
+    var A: HashSet(u32) = .empty;
+    defer A.deinit(testing.allocator);
+
+    try A.addAssumeNotIn(testing.allocator, 1);
+    try expectEqual(1, A.cardinality());
+    try expect(A.contains(1));
+}
+
+test "add assume not in assume capacity" {
+    var A: HashSet(u32) = try .initCapacity(testing.allocator, 2);
+    defer A.deinit(testing.allocator);
+
+    A.addAssumeNotInAndCapacity(1);
+    A.addAssumeNotInAndCapacity(2);
+    try expectEqual(2, A.cardinality());
+    try expect(A.contains(1));
+    try expect(A.contains(2));
 }
