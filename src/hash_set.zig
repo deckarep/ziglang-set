@@ -113,18 +113,16 @@ pub fn HashSetWithContext(comptime E: type, comptime Context: type, comptime max
         }
 
         pub fn add(self: *Self, allocator: Allocator, element: E) Allocator.Error!bool {
-            const prevCount = self.unmanaged.count();
-            try self.unmanaged.put(allocator, element, {});
-            return prevCount != self.unmanaged.count();
+            const result = try self.unmanaged.getOrPut(allocator, element);
+            return !result.found_existing;
         }
 
         /// Adds a single element to the set. Asserts that there is enough capacity.
         /// A bool is returned indicating if the element was actually added
         /// if not already known.
         pub fn addAssumeCapacity(self: *Self, element: E) bool {
-            const prevCount = self.unmanaged.count();
-            self.unmanaged.putAssumeCapacity(element, {});
-            return prevCount != self.unmanaged.count();
+            const result = self.unmanaged.getOrPutAssumeCapacity(element);
+            return !result.found_existing;
         }
 
         /// Appends all elements from the provided set, and may allocate.
@@ -1000,4 +998,31 @@ test "custom hash function string usage" {
     _ = try A.add(testing.allocator, "Hello\r");
     _ = try A.add(testing.allocator, "Hello\t");
     try expectEqual(7, A.cardinality());
+}
+
+test "add boolean" {
+    var A: HashSet(u32) = .empty;
+    defer A.deinit(testing.allocator);
+
+    const five_inserted = try A.add(testing.allocator, 5);
+    try expectEqual(five_inserted, true);
+    const six_inserted = try A.add(testing.allocator, 6);
+    try expectEqual(six_inserted, true);
+
+    const five_again_inserted = try A.add(testing.allocator, 5);
+    try expectEqual(five_again_inserted, false);
+}
+
+test "addAssumeCapacity" {
+    var A: HashSet(u32) = try .initCapacity(testing.allocator, 3);
+    defer A.deinit(testing.allocator);
+
+    try expect(A.addAssumeCapacity(1));
+    try expect(A.addAssumeCapacity(2));
+    try expect(A.addAssumeCapacity(3));
+
+    try expect(!A.addAssumeCapacity(1));
+
+    try expectEqual(3, A.cardinality());
+    try expect(A.capacity() >= 3);
 }

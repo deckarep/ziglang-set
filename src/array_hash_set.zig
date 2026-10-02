@@ -94,9 +94,16 @@ pub fn ArraySet(comptime E: type) type {
         }
 
         pub fn add(self: *Self, allocator: Allocator, element: E) Allocator.Error!bool {
-            const prevCount = self.unmanaged.count();
-            try self.unmanaged.put(allocator, element, {});
-            return prevCount != self.unmanaged.count();
+            const result = try self.unmanaged.getOrPut(allocator, element);
+            return !result.found_existing;
+        }
+
+        /// Adds a single element to the set. Asserts that there is enough capacity.
+        /// A bool is returned indicating if the element was actually added
+        /// if not already known.
+        pub fn addAssumeCapacity(self: *Self, element: E) bool {
+            const result = self.unmanaged.getOrPutAssumeCapacity(element);
+            return !result.found_existing;
         }
 
         /// Appends all elements from the provided slice, and may allocate.
@@ -829,4 +836,29 @@ test "sizeOf matches" {
     const expectedByteSize = 40;
     try expectEqual(expectedByteSize, @sizeOf(std.AutoArrayHashMapUnmanaged(u32, void)));
     try expectEqual(expectedByteSize, @sizeOf(ArraySet(u32)));
+}
+
+test "add boolean" {
+    var A: ArraySet(u32) = .empty;
+    defer A.deinit(testing.allocator);
+
+    const five_inserted = try A.add(testing.allocator, 5);
+    try expectEqual(five_inserted, true);
+    const six_inserted = try A.add(testing.allocator, 6);
+    try expectEqual(six_inserted, true);
+
+    const five_again_inserted = try A.add(testing.allocator, 5);
+    try expectEqual(five_again_inserted, false);
+}
+
+test "addAssumeCapacity" {
+    var A = try ArraySet(u32).initCapacity(testing.allocator, 2);
+    defer A.deinit(testing.allocator);
+
+    try expectEqual(true, A.addAssumeCapacity(5));
+    try expectEqual(true, A.addAssumeCapacity(6));
+    try expectEqual(false, A.addAssumeCapacity(5));
+    try expectEqual(2, A.cardinality());
+    try expect(A.contains(5));
+    try expect(A.contains(6));
 }
